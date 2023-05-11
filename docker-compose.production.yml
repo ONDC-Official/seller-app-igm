@@ -1,0 +1,10 @@
+version: "3"
+services:
+  backend:
+    container_name: bugzilla-service
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    ports:
+      - "8001:8000"
+    restart: always
