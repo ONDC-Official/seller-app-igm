@@ -6,7 +6,6 @@ const port = process.env.PORT || 8000;
 
 const app = createServer();
 
-console.log(process.env.DB_CONNECTION_STRING);
 try {
   dbConnect()
     .then(() => {
