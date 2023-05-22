@@ -8,7 +8,6 @@ const dbConnect = async () => {
 
   const dbUri = process.env.DB_CONNECTION_STRING;
 
-  console.log("dbUri", dbUri);
   return mongoose.connect(dbUri);
 };
 
