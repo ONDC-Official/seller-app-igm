@@ -1,4 +1,11 @@
-import { Issue } from "../Model/issueSchema";
+import { Issue } from "../Model/issue";
+
+interface IUpdateIssueWithDynamicID {
+  issueKeyToFind?: "context.transaction_id";
+  issueValueToFind: string | any;
+  keyPathForUpdating: string | any;
+  issueSchema: {};
+}
 
 class DbServices {
   /**
@@ -9,29 +16,86 @@ class DbServices {
     transactionId: string | any,
     issueSchema: object = {}
   ) => {
-    return await Issue.findOneAndUpdate(
+    return await Issue.updateOne(
       {
         "context.transaction_id": transactionId,
       },
       {
-        ...issueSchema,
+        $set: {
+          "message.issue.issue_actions.complainant_actions": issueSchema,
+        },
       },
+
       { upsert: true }
     );
   };
 
-  getIssueByTransactionId = async (transactionId: string) => {
-    const issue: any = await Issue.find({
-      "context.transaction_id": transactionId,
+  addOrUpdateIssueWithKeyValue = async ({
+    issueKeyToFind,
+    issueValueToFind,
+    keyPathForUpdating,
+    issueSchema,
+  }: IUpdateIssueWithDynamicID) => {
+    return await Issue.updateOne(
+      {
+        [`${issueKeyToFind}`]: issueValueToFind,
+      },
+      {
+        $set: {
+          [`${keyPathForUpdating}`]: issueSchema,
+        },
+      },
+
+      { upsert: true }
+    );
+  };
+
+  findIssueWithPathAndValue = async ({
+    value,
+    key,
+  }: {
+    value: string;
+    key: string;
+  }) => {
+    const issue: any = await Issue.findOne({
+      [`${key}`]: value,
     });
 
-    if (!(issue || issue?.length)) {
+    if (!issue) {
       return {
         status: 404,
         name: "NO_RECORD_FOUND_ERROR",
         message: "Record not found",
       };
-    } else return issue?.[0];
+    }
+    return issue;
+  };
+
+  getIssueByTransactionId = async (transactionId: string) => {
+    const issue: any = await Issue.findOne({
+      "context.transaction_id": transactionId,
+    });
+
+    if (!issue) {
+      return {
+        status: 404,
+        name: "NO_RECORD_FOUND_ERROR",
+        message: "Record not found",
+      };
+    } else return issue;
+  };
+  getIssueByIssueId = async (issue_id: string) => {
+    const issue: any = await Issue.findOne({
+      "message.issue.id": issue_id,
+    });
+
+    if (!issue) {
+      return {
+        status: 404,
+        name: "NO_RECORD_FOUND_ERROR",
+        message: "Record not found",
+      };
+    } else return issue;
   };
 }
 export default DbServices;

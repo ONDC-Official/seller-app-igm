@@ -1,4 +1,4 @@
-export interface Issue {
+export interface IIssue {
   context: Context;
   message: Message;
 }
@@ -14,12 +14,14 @@ export interface Context {
   bpp_uri: string;
   transaction_id: string;
   message_id: string;
-  timestamp: Date;
+  timestamp: string;
   ttl: string;
 }
 export interface Message {
   issue: Issue;
 }
+
+enum Rating{"THUMBS-UP","THUMBS-DOWN"}
 export interface Issue {
   id: string;
   category: string;
@@ -33,8 +35,9 @@ export interface Issue {
   status: string;
   issue_type: string;
   issue_actions: IssueActions;
-  created_at: Date;
-  updated_at: Date;
+  rating?: Rating;
+  created_at: string;
+  updated_at: string;
 }
 export interface ComplainantInfo {
   person: Person;
@@ -62,17 +65,40 @@ export interface ExpectedResTime {
 }
 export interface IssueActions {
   complainant_actions: ComplainantAction[];
+  respondent_actions: RespondentAction[];
 }
 export interface ComplainantAction {
   complainant_action: string;
   short_desc: string;
-  updated_at: Date;
+  updated_at: string;
   updated_by: UpdatedBy;
 }
 export interface UpdatedBy {
   org: Org;
   contact: UpdatedByContact;
   person: Org;
+}
+export interface RespondentAction {
+  respondent_action: string;
+  short_desc: string;
+  updated_at: string;
+  updated_by: UpdatedBy;
+  cascaded_level: number;
+}
+
+export interface UpdatedBy {
+  org: Org;
+  contact: Contact;
+  person: Org;
+}
+
+export interface Contact {
+  phone: string;
+  email: string;
+}
+
+export interface Org {
+  name: string;
 }
 export interface UpdatedByContact {
   phone: string;

@@ -9,8 +9,10 @@ const app = createServer();
 try {
   dbConnect()
     .then(() => {
-      logger.info("Database connection successful");
+      const date = new Date();
 
+      console.log("date", date);
+      logger.info("Database connection successful");
       app.listen(port, (): void => {
         logger.info(`Connected successfully on port ${port}`);
       });
