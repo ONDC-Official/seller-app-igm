@@ -1,8 +1,13 @@
 import { Request, Response } from "express";
 import { logger } from "../shared/logger";
-import { CreateIssueSchemaValidator } from "../utils/validator";
-import { Issue } from "../Model/issueSchema";
+import { Issue } from "../Model/issue";
 import DbServices from "../utils/DbServices";
+
+import { IIssueResponse } from "../interfaces/issue_response";
+
+import { GatewayIssueService } from "./index.service";
+
+const gatewayIssueService = new GatewayIssueService();
 
 const dbServices = new DbServices();
 
@@ -13,104 +18,184 @@ class IssueService {
 
   async createIssue(req: Request, res: Response) {
     try {
-      //   const validValue = CreateIssueSchemaValidator(req.body);
-      //   if (validValue) {
-      //     return res.status(400).send({ error: validValue.message });
-      //   }
-
-    const resonse = {
-        context: {
-          domain: "ONDC:RET10",
-          country: "IND",
-          city: "std:080",
-          action: "on_issue",
-          core_version: "1.0.0",
-          bap_id: "buyerapp.com",
-          bap_uri: "https://buyerapp.com/ondc",
-          bpp_id: "sellerapp.com",
-          bpp_uri: "https://sellerapp.com/ondc",
-          transaction_id: "T1",
-          message_id: "M1",
-          timestamp: "2023-01-15T10:10:00.142Z",
-        },
-        message: {
-          issue: {
-            id: "I1",
-            issue_actions: {
-              respondent_actions: [
-                {
-                  respondent_action: "PROCESSING",
-                  short_desc: "Complaint is being processed",
-                  updated_at: "2023-01-15T10:10:00.142Z",
-                  updated_by: {
-                    org: {
-                      name: "https://sellerapp.com/ondc::ONDC:RET10",
-                    },
-                    contact: {
-                      phone: "9450394140",
-                      email: "respondentapp@respond.com",
-                    },
-                    person: {
-                      name: "Jane Doe",
-                    },
-                  },
-                  cascaded_level: 1,
-                },
-              ],
-            },
-            created_at: "2023-01-15T10:00:00.469Z",
-            updated_at: "2023-01-15T10:10:00.142Z",
-          },
-        },
-      };
-
-      const result = await Issue.find({
-        "context.transaction_id": req.body.context.transaction_id,
+      const issue = await dbServices.findIssueWithPathAndValue({
+        key: "context.transaction_id",
+        value: req.body.context.transaction_id,
       });
 
-      if (result?.length === 0) {
+      if (issue?.status === 404) {
         await Issue.create(req.body);
-        return res.status(201).send({ message: "Issue has been created" });
+
+        try {
+          await gatewayIssueService.scheduleAJob({
+            transaction_id: req.body.context.transaction_id,
+            created_at: req.body.message.issue.created_at,
+            payload: issue,
+          });
+          return res.status(201).send({
+            status: 201,
+            success: true,
+            message: "Issue has been created",
+          });
+        } catch (e) {
+          return res.status(500).send({
+            success: false,
+            message: e || "Something went wrong",
+          });
+        }
       }
 
-      const findAndUpdate = await dbServices.addOrUpdateIssueWithtransactionId(
-        req.body.context.transaction_id,
-        req.body
-      );
-
-      console.log(
-        "🚀 ~ file: issus.service.ts:34 ~ IssueService ~ createIssue ~ findAndUpdate:",
-        findAndUpdate
-      );
+      await dbServices.addOrUpdateIssueWithKeyValue({
+        issueKeyToFind: "context.transaction_id",
+        issueValueToFind: req.body.context.transaction_id,
+        keyPathForUpdating: "message.issue",
+        issueSchema: {
+          ...issue?.message?.issue,
+          issue_type: req.body.message.issue_type,
+          status: req.body.message.issue.status,
+          issue_actions: {
+            complainant_actions:
+              req.body.message.issue.issue_actions.complainant_actions,
+          },
+          rating: req.body.message.issue.rating,
+        },
+      });
 
       logger.info("pushed into database");
+
+      return res.status(200).send({
+        status: 200,
+        success: true,
+        message: "Issue has been updated",
+      });
     } catch (error: any) {
       logger.error(error);
-      return error;
+      return res
+        .status(500)
+        .json({ error: true, message: error || "Something went wrong" });
     }
   }
 
-  async getAllIssues(req: Request) {
-    let { bap_id } = req.body;
+  async getAllIssues(req: Request, res: Response) {
+    if (req.body.user) {
+      const issueResults = await dbServices.findIssueWithPathAndValue({
+        key: "message.issue.order_details.provider_id",
+        value: req.params.providerId,
+      });
 
-    const result = await Issue.find({ "context.bap_id": bap_id });
+      if (issueResults?.issues.length === 0) {
+        res.status(200).send({ message: "There is no issue", issues: [] });
+      }
 
-    return { Issues: result };
+      return res.status(200).send({ success: true, issueResults });
+    }
+
+    const allIssues = await Issue.find();
+
+    if (allIssues.length === 0) {
+      return res.status(200).send({ message: "There is no issue", issues: [] });
+    }
+
+    return res.status(200).send({ success: true, allIssues });
   }
 
-  async findIssue(req: Request) {
-    let { transaction_id } = req.body;
+  async issue_response({ req, res }: { req: IIssueResponse; res: Response }) {
+    try {
+      const data = await dbServices.findIssueWithPathAndValue({
+        key: "context.transaction_id",
+        value: req.transaction_id,
+      });
 
-    const result = await dbServices.getIssueByTransactionId(transaction_id);
+      if (data.status === 404) {
+        return { message: "There is no issue", issues: [] };
+      }
+
+      const payload: IIssueResponse = {
+        transaction_id: req.transaction_id,
+        refund_amount: req.refund_amount,
+        long_desc: req.long_desc,
+        respondent_action: req.respondent_action,
+        short_desc: req.short_desc,
+        updated_at: new Date(),
+        updated_by: {
+          org: {
+            name: `${data.context.bpp_id + process.env.DOMAIN}`,
+          },
+          contact: {
+            phone: req.updated_by.contact.phone,
+            email: req.updated_by.contact.email,
+          },
+          person: {
+            name: req.updated_by.person.name,
+          },
+        },
+        cascaded_level: 1,
+      };
+
+      await Issue.updateOne(
+        {
+          "context.transaction_id": payload.transaction_id,
+        },
+        {
+          $set: {
+            "message.issue.issue_actions.respondent_actions": [
+              ...data.message.issue.issue_actions.respondent_actions,
+              {
+                respondent_action: payload.respondent_action,
+                short_desc: payload.short_desc,
+                updated_by: payload.updated_by,
+              },
+            ],
+          },
+        },
+
+        { upsert: true }
+      );
+
+      gatewayIssueService.on_issue(data);
+
+      const updatedData = await dbServices.getIssueByTransactionId(
+        req.transaction_id
+      );
+
+      return updatedData;
+    } catch (err) {
+      return res
+        .status(500)
+        .json({ error: true, message: err || "Something went wrong" });
+    }
+  }
+
+  async getSingleIssue(req: Request, res: Response) {
+    const { transactionId } = req.params;
+
+    const result = await dbServices.findIssueWithPathAndValue({
+      key: "context.transaction_id",
+      value: transactionId,
+    });
     console.log(
-      "🚀 ~ file: issus.service.ts:53 ~ IssueService ~ findIssue ~ result:",
+      "🚀 ~ file: issus.service.ts:182 ~ IssueService ~ getSingleIssue ~ result:",
       result
     );
 
-    return { Issues: result };
+    if (result.status === 404) {
+      res.status(200).send({ message: "There is no issue", issues: [] });
+    }
+
+    res.status(200).send({ success: true, result });
+
+    return { issue: result };
   }
 
-  async getIssueStatus() {}
+  async issueStatus(req: Request, res: Response) {
+    const issue_id = req.body.message.issue_id;
+
+    const result = await dbServices.getIssueByIssueId(issue_id);
+
+    // this.on_issue_status(result);
+
+    return res.status(200).send({ issue: result });
+  }
 }
 
 export default IssueService;

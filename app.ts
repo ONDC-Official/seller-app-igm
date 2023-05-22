@@ -11,7 +11,7 @@ const createServer = (): express.Application => {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  app.use("/v1", issueRoutes);
+  app.use("/api/client", issueRoutes);
 
   // eslint-disable-next-line no-unused-vars
   app.get("/", async (_req: Request, res: Response): Promise<Response> => {

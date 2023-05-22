@@ -23,6 +23,7 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true,
 
     /* Module Resolution Options */
     "moduleResolution": "node",

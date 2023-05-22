@@ -1,4 +1,4 @@
-export interface OnIssueStatus {
+export interface IOnIssueStatus {
     context: Context;
     message: Message;
 }
@@ -15,7 +15,7 @@ export interface Context {
     bpp_uri:        string;
     transaction_id: string;
     message_id:     string;
-    timestamp:      Date;
+    timestamp:      string;
 }
 
 export interface Message {
@@ -25,8 +25,8 @@ export interface Message {
 export interface Issue {
     id:                  string;
     issue_actions:       IssueActions;
-    created_at:          Date;
-    updated_at:          Date;
+    created_at:          string;
+    updated_at:          string;
     resolution_provider: ResolutionProvider;
     resolution:          Resolution;
 }
@@ -38,7 +38,7 @@ export interface IssueActions {
 export interface RespondentAction {
     respondent_action: string;
     short_desc:        string;
-    updated_at:        Date;
+    updated_at:        string;
     updated_by:        Organization;
     cascaded_level:    number;
 }

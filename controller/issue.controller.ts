@@ -14,10 +14,7 @@ class IssueController {
   async createIssue(req: Request, res: Response, next: NextFunction) {
     try {
       logger.info(req);
-
-      const data = await issueService.createIssue(req, res);
-
-      res.status(201).send({ success: true, data });
+      await issueService.createIssue(req, res);
     } catch (err) {
       next(err);
     }
@@ -33,11 +30,48 @@ class IssueController {
   async getAllIssues(req: Request, res: Response, next: NextFunction) {
     try {
       logger.info(req);
+      await issueService.getAllIssues(req, res);
+    } catch (err) {
+      next(err);
+    }
+  }
 
-      const data = await issueService.getAllIssues(req);
+  /**
+   * issue_status
+   * @param {*} req    HTTP request object
+   * @param {*} res    HTTP response object
+   * @param {*} next   Callback argument to the middleware function
+   */
 
-      if (data?.Issues.length === 0) {
-        res.status(200).send({ message: "There is no issue", Issues: [] });
+  async issue_response(req: Request, res: Response, next: NextFunction) {
+    try {
+      logger.info(req);
+
+      const data = await issueService.issue_response({
+        req: req.body,
+        res: res,
+      });
+      res.status(200).send({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * issue_status
+   * @param {*} req    HTTP request object
+   * @param {*} res    HTTP response object
+   * @param {*} next   Callback argument to the middleware function
+   */
+
+  async issue_status(req: Request, res: Response, next: NextFunction) {
+    try {
+      logger.info(req);
+
+      const data = await issueService.issueStatus(req, res);
+
+      if (!data) {
+        res.status(200).send({ message: "There is no issue", issues: [] });
       }
 
       res.status(200).send({ success: true, data });
@@ -53,17 +87,11 @@ class IssueController {
    * @param {*} next   Callback argument to the middleware function
    */
 
-  async getIssues(req: Request, res: Response, next: NextFunction) {
+  async getSingleIssue(req: Request, res: Response, next: NextFunction) {
     try {
       logger.info(req);
 
-      const data = await issueService.findIssue(req);
-
-      if (data?.Issues.length === 0) {
-        res.status(200).send({ message: "There is no issue", Issues: [] });
-      }
-
-      res.status(200).send({ success: true, data });
+      await issueService.getSingleIssue(req, res);
     } catch (err) {
       next(err);
     }
