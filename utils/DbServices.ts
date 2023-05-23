@@ -4,7 +4,7 @@ interface IUpdateIssueWithDynamicID {
   issueKeyToFind?: "context.transaction_id";
   issueValueToFind: string | any;
   keyPathForUpdating: string | any;
-  issueSchema: {};
+  issueSchema: any;
 }
 
 class DbServices {

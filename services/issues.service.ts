@@ -77,29 +77,48 @@ class IssueService {
   }
 
   async getAllIssues(req: Request, res: Response) {
-    if (req.body.user) {
-      const issueResults = await dbServices.findIssueWithPathAndValue({
-        key: "message.issue.order_details.provider_id",
-        value: req.params.providerId,
-      });
+    const offset: string = req.query.offset?.toString() ?? "0";
+    const limit: string = req.query.limit?.toString() ?? "10";
+    const query: { offset: number; limit: number } = {
+      offset: parseInt(offset, 10),
+      limit: parseInt(limit, 10),
+    };
 
-      if (issueResults?.issues.length === 0) {
+    if (req.body.user.organization) {
+      const specificProviderIssue = await Issue.find({
+        "message.issue.order_details.provider_id": req.body.user.organization,
+      })
+        .sort({ "message.issue.created_at": -1 })
+        .skip(query.offset * query.limit)
+        .limit(query.limit)
+        .lean();
+
+      if (specificProviderIssue?.length === 0) {
+        res.status(200).send({ message: "There is no issue", issues: [] });
+      }
+    }
+
+    if (req.body.user.user.role === "Super Admin") {
+      const allIssues = await Issue.find()
+        .sort({ "message.issue.created_at": -1 })
+        .skip(query.offset * query.limit)
+        .limit(query.limit)
+        .lean();
+
+      if (allIssues?.length === 0) {
         res.status(200).send({ message: "There is no issue", issues: [] });
       }
 
-      return res.status(200).send({ success: true, issueResults });
+      return res.status(200).send({ success: true, allIssues });
     }
 
-    const allIssues = await Issue.find();
-
-    if (allIssues.length === 0) {
-      return res.status(200).send({ message: "There is no issue", issues: [] });
-    }
-
-    return res.status(200).send({ success: true, allIssues });
+    return res
+      .status(401)
+      .send({ success: false, message: "You are not authorized" });
   }
 
   async issue_response({ req, res }: { req: IIssueResponse; res: Response }) {
+    let on_issue;
     try {
       const data = await dbServices.findIssueWithPathAndValue({
         key: "context.transaction_id",
@@ -132,33 +151,38 @@ class IssueService {
         cascaded_level: 1,
       };
 
-      await Issue.updateOne(
-        {
-          "context.transaction_id": payload.transaction_id,
-        },
-        {
-          $set: {
-            "message.issue.issue_actions.respondent_actions": [
-              ...data.message.issue.issue_actions.respondent_actions,
-              {
-                respondent_action: payload.respondent_action,
-                short_desc: payload.short_desc,
-                updated_by: payload.updated_by,
-              },
-            ],
+      dbServices.addOrUpdateIssueWithKeyValue({
+        issueKeyToFind: "context.transaction_id",
+        issueValueToFind: payload.transaction_id,
+        keyPathForUpdating: "message.issue.issue_actions.respondent_actions",
+        issueSchema: [
+          ...data.message.issue.issue_actions.respondent_actions,
+          {
+            respondent_action: payload.respondent_action,
+            short_desc: payload.short_desc,
+            updated_by: payload.updated_by,
           },
-        },
+        ],
+      });
 
-        { upsert: true }
-      );
+      if (
+        data.message.status === "OPEN" ||
+        data.message.status === "ESCALATE"
+      ) {
+        on_issue = await gatewayIssueService.on_issue(data);
+      }
 
-      gatewayIssueService.on_issue(data);
+      if (on_issue) {
+        await dbServices.getIssueByTransactionId(req.transaction_id);
+        // TODO - return send() with on_issue data
+        return res.status(200);
+      }
 
-      const updatedData = await dbServices.getIssueByTransactionId(
-        req.transaction_id
-      );
+      // TODO - change on_issue according to the response you will get
 
-      return updatedData;
+      return res
+        .status(500)
+        .json({ error: true, message: on_issue || "Something went wrong" });
     } catch (err) {
       return res
         .status(500)
@@ -173,28 +197,35 @@ class IssueService {
       key: "context.transaction_id",
       value: transactionId,
     });
-    console.log(
-      "🚀 ~ file: issus.service.ts:182 ~ IssueService ~ getSingleIssue ~ result:",
-      result
-    );
 
     if (result.status === 404) {
-      res.status(200).send({ message: "There is no issue", issues: [] });
+      return res.status(200).send({ message: "There is no issue", issues: [] });
     }
 
-    res.status(200).send({ success: true, result });
-
-    return { issue: result };
+    return res.status(200).send({ success: true, result });
   }
 
   async issueStatus(req: Request, res: Response) {
-    const issue_id = req.body.message.issue_id;
+    try {
+      const issue_id = req.body.message.issue_id;
 
-    const result = await dbServices.getIssueByIssueId(issue_id);
+      const result = await dbServices.getIssueByIssueId(issue_id);
 
-    // this.on_issue_status(result);
+      const response = await gatewayIssueService.on_issue_status(result);
 
-    return res.status(200).send({ issue: result });
+      //TODO: check response and act according now not tested yet
+      if (response) {
+        return res.status(200).json({ success: true, data: response.data });
+      }
+
+      return res
+        .status(500)
+        .json({ error: true, message: "Something went wrong" });
+    } catch (e) {
+      return res
+        .status(500)
+        .json({ error: true, message: e || "Something went wrong" });
+    }
   }
 }
 

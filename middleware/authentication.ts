@@ -14,7 +14,8 @@ const verifyToken = () => {
       } else {
         const decode: any = jwt.verify(
           authToken,
-          process.env.AUTH_ACCESS_JWT_SECRET || ""
+          process.env.AUTH_ACCESS_JWT_SECRET ||
+            "wftd3hg5*fd5h6fbvcy6rtg5wftd3hg5*fd5xxx"
         );
         req.body.user = decode;
         next();

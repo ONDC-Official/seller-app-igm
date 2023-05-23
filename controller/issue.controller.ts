@@ -1,6 +1,6 @@
 import { Response, Request, NextFunction } from "express";
 import { logger } from "../shared/logger";
-import IssueService from "../services/issus.service";
+import IssueService from "../services/issues.service";
 
 const issueService = new IssueService();
 

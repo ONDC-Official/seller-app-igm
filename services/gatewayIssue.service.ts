@@ -68,48 +68,50 @@ class GatewayIssueService {
   }
 
   async on_issue(onIssueData: IIssue) {
-    const onIssuePayload: IOnIssue = {
-      context: {
-        domain: onIssueData.context.domain,
-        country: onIssueData.context.country,
-        city: onIssueData.context.city,
-        action: "on_issue",
-        core_version: "1.0.0",
-        bap_id: onIssueData.context.bap_id,
-        bap_uri: onIssueData.context.bap_uri,
-        bpp_id: onIssueData.context.bpp_id,
-        bpp_uri: onIssueData.context.bpp_uri,
-        transaction_id: onIssueData.context.transaction_id,
-        message_id: onIssueData.context.message_id,
-        timestamp: onIssueData.context.timestamp,
-      },
-      message: {
-        issue: {
-          id: onIssueData.message.issue.id,
-          issue_actions: {
-            respondent_actions:
-              onIssueData.message.issue.issue_actions.respondent_actions,
-          },
-          created_at: onIssueData.message.issue.created_at,
-          updated_at: this.currentDate.toISOString(),
+    try {
+      const onIssuePayload: IOnIssue = {
+        context: {
+          domain: onIssueData.context.domain,
+          country: onIssueData.context.country,
+          city: onIssueData.context.city,
+          action: "on_issue",
+          core_version: "1.0.0",
+          bap_id: onIssueData.context.bap_id,
+          bap_uri: onIssueData.context.bap_uri,
+          bpp_id: onIssueData.context.bpp_id,
+          bpp_uri: onIssueData.context.bpp_uri,
+          transaction_id: onIssueData.context.transaction_id,
+          message_id: onIssueData.context.message_id,
+          timestamp: onIssueData.context.timestamp,
         },
-      },
-    };
+        message: {
+          issue: {
+            id: onIssueData.message.issue.id,
+            issue_actions: {
+              respondent_actions:
+                onIssueData.message.issue.issue_actions.respondent_actions,
+            },
+            created_at: onIssueData.message.issue.created_at,
+            updated_at: this.currentDate.toISOString(),
+          },
+        },
+      };
 
-    const createBug = new PostHttpRequest({
-      url: "/on_issue",
-      method: "post",
-      data: onIssuePayload,
-    });
+      const createBug = new PostHttpRequest({
+        url: "/on_issue",
+        method: "post",
+        data: onIssuePayload,
+      });
 
-    const response: any = await createBug.send();
+      const response: any = await createBug.send();
 
-    return response;
+      return response;
+    } catch (e) {
+      return e;
+    }
   }
 
   async on_issue_status(onIssueStatusData: IIssue) {
-    console.log("onIssueStatusData", onIssueStatusData);
-
     const onIssueStatusPayload = {
       context: {
         domain: onIssueStatusData.context.domain,
