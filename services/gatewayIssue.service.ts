@@ -74,33 +74,38 @@ class GatewayIssueService {
 
         //TODO: update database conditionally once you get response from on_issue api
 
-        dbServices.addOrUpdateIssueWithKeyValue({
-          issueKeyToFind: "context.transaction_id",
-          issueValueToFind: transaction_id,
-          keyPathForUpdating: "message.issue.issue_actions.respondent_actions",
-          issueSchema: {
-            respondent_action: "PROCESSING",
-            short_desc: "We are investigating your concern.",
-            updated_at: this.currentDate,
-            updated_by: {
-              org: {
-                name: "ondc-tech-support-buyer-app.ondc.org::nic2004:52110",
+        try {
+          dbServices.addOrUpdateIssueWithKeyValue({
+            issueKeyToFind: "context.transaction_id",
+            issueValueToFind: transaction_id,
+            keyPathForUpdating:
+              "message.issue.issue_actions.respondent_actions",
+            issueSchema: {
+              respondent_action: "PROCESSING",
+              short_desc: "We are investigating your concern.",
+              updated_at: this.currentDate,
+              updated_by: {
+                org: {
+                  name: "ondc-tech-support-buyer-app.ondc.org::nic2004:52110",
+                },
+                contact: {
+                  phone: "6239083807",
+                  email: "Rishabhnand.singh@ondc.org",
+                },
+                person: {
+                  name: "Rishabhnand Singh",
+                },
+                cascaded_level: 1,
               },
-              contact: {
-                phone: "6239083807",
-                email: "Rishabhnand.singh@ondc.org",
-              },
-              person: {
-                name: "Rishabhnand Singh",
-              },
-              cascaded_level: 1,
             },
-          },
-        });
+          });
 
-        const response = await this.on_issue(onIssuePayload);
+          const response = await this.on_issue(onIssuePayload);
 
-        return response;
+          return response;
+        } catch (error) {
+          return error;
+        }
       }
     );
   }
