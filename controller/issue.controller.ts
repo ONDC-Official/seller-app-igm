@@ -47,10 +47,7 @@ class IssueController {
     try {
       logger.info(req);
 
-      const data = await issueService.issue_response({
-        req: req.body,
-        res: res,
-      });
+      const data = await issueService.issue_response(req,res);
       res.status(200).send({ success: true, data });
     } catch (err) {
       next(err);

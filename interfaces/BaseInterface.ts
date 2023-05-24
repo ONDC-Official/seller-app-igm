@@ -1,17 +1,128 @@
-// type ChangeFields<T, R> = Omit<T, keyof R> & R;
+type ChangeFields<T, R> = Omit<T, keyof R> & R;
 
-// type NewIssue = ChangeFields<
-//   IBaseIssue,
-//   {
-//     message: ChangeFields<
-//       Message,
-//       { issue: Omit<Issue, "rating" | "resolution" | "resolution_provider"> }
-//     >;
-//   }
-// >;
+export type _Issue = ChangeFields<
+  IBaseIssue,
+  {
+    message: ChangeFields<
+      Message,
+      { issue: Omit<Issue, "rating" | "resolution" | "resolution_provider"> }
+    >;
+  }
+>;
 
-// const newIssue: NewIssue = {};
+// use this for /on_issue
+export type _On_Issue = ChangeFields<
+  IBaseIssue,
+  {
+    context: Omit<Context, "ttl">;
+    message: ChangeFields<
+      Message,
+      {
+        issue: ChangeFields<
+          Omit<
+            Issue,
+            | "order_details"
+            | "issue_type"
+            | "category"
+            | "complainant_info"
+            | "description"
+            | "expected_resolution_time"
+            | "expected_response_time"
+            | "source"
+            | "status"
+            | "sub_category"
+            | "rating"
+            | "resolution"
+            | "resolution_provider"
+          >,
+          {
+            issue_actions: Omit<IssueActions, "complainant_actions">;
+          }
+        >;
+      }
+    >;
+  }
+>;
 
+// use this for /on_issue_status when Seller has RESOLVED the issue 
+
+export type _On_Issue_Status_Resoloved = ChangeFields<
+  IBaseIssue,
+  {
+    context: Omit<Context, "ttl">;
+    message: ChangeFields<
+      Message,
+      {
+        issue: ChangeFields<
+          Omit<
+            Issue,
+            | "order_details"
+            | "issue_type"
+            | "category"
+            | "complainant_info"
+            | "description"
+            | "expected_resolution_time"
+            | "expected_response_time"
+            | "source"
+            | "status"
+            | "sub_category"
+            | "rating"
+          >,
+          {
+            issue_actions: Omit<IssueActions, "complainant_actions">;
+          }
+        >;
+      }
+    >;
+  }
+>;
+
+const newIssue: _On_Issue = {
+  context: {
+    domain: "ONDC:RET10",
+    country: "IND",
+    city: "std:080",
+    action: "on_issue",
+    core_version: "1.0.0",
+    bap_id: "buyerapp.com",
+    bap_uri: "https://buyerapp.com/ondc",
+    bpp_id: "sellerapp.com",
+    bpp_uri: "https://sellerapp.com/ondc",
+    transaction_id: "T1",
+    message_id: "M1",
+    timestamp: "2023-01-15T10:10:00.142Z",
+  },
+  message: {
+    issue: {
+      id: "I1",
+      issue_actions: {
+        respondent_actions: [
+          {
+            respondent_action: "PROCESSING",
+            short_desc: "Complaint is being processed",
+            updated_at: "2023-01-15T10:10:00.142Z",
+            updated_by: {
+              org: {
+                name: "https://sellerapp.com/ondc::ONDC:RET10",
+              },
+              contact: {
+                phone: "9450394140",
+                email: "respondentapp@respond.com",
+              },
+              person: {
+                name: "Jane Doe",
+              },
+            },
+            cascaded_level: 1,
+          },
+        ],
+      },
+      created_at: "2023-01-15T10:00:00.469Z",
+      updated_at: "2023-01-15T10:10:00.142Z",
+    },
+  },
+};
+/// Base interface for all the All Responses
 export interface IBaseIssue {
   context: Context;
   message: Message;

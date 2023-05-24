@@ -26,6 +26,54 @@ class GatewayIssueService {
       this.startProcessingIssueAfter5Minutes(created_at),
 
       async () => {
+        const onIssuePayload: IOnIssue = {
+          context: {
+            domain: payload.context.domain,
+            country: payload.context.country,
+            city: payload.context.city,
+            action: "on_issue",
+            core_version: "1.0.0",
+            bap_id: payload.context.bap_id,
+            bap_uri: payload.context.bap_uri,
+            bpp_id: payload.context.bpp_id,
+            bpp_uri: payload.context.bpp_uri,
+            transaction_id: payload.context.transaction_id,
+            message_id: payload.context.message_id,
+            timestamp: payload.context.timestamp,
+          },
+          message: {
+            issue: {
+              id: payload.message.issue.id,
+              issue_actions: {
+                respondent_actions: [
+                  {
+                    respondent_action: "PROCESSING",
+                    short_desc: "We are investigating your concern.",
+                    updated_at: "",
+                    updated_by: {
+                      org: {
+                        name: "ondc-tech-support-buyer-app.ondc.org::nic2004:52110",
+                      },
+                      contact: {
+                        phone: "6239083807",
+                        email: "Rishabhnand.singh@ondc.org",
+                      },
+                      person: {
+                        name: "Rishabhnand Singh",
+                      },
+                    },
+                    cascaded_level: 1,
+                  },
+                ],
+              },
+              created_at: payload.message.issue.created_at,
+              updated_at: this.currentDate.toISOString(),
+            },
+          },
+        };
+
+        //TODO: update database conditionally once you get response from on_issue api
+
         dbServices.addOrUpdateIssueWithKeyValue({
           issueKeyToFind: "context.transaction_id",
           issueValueToFind: transaction_id,
@@ -45,11 +93,12 @@ class GatewayIssueService {
               person: {
                 name: "Rishabhnand Singh",
               },
+              cascaded_level: 1,
             },
           },
         });
 
-        const response = await this.on_issue(payload);
+        const response = await this.on_issue(onIssuePayload);
 
         return response;
       }
@@ -68,40 +117,12 @@ class GatewayIssueService {
     return newDateString;
   }
 
-  async on_issue(onIssueData: IIssue) {
+  async on_issue(onIssueData: IOnIssue) {
     try {
-      const onIssuePayload: IOnIssue = {
-        context: {
-          domain: onIssueData.context.domain,
-          country: onIssueData.context.country,
-          city: onIssueData.context.city,
-          action: "on_issue",
-          core_version: "1.0.0",
-          bap_id: onIssueData.context.bap_id,
-          bap_uri: onIssueData.context.bap_uri,
-          bpp_id: onIssueData.context.bpp_id,
-          bpp_uri: onIssueData.context.bpp_uri,
-          transaction_id: onIssueData.context.transaction_id,
-          message_id: onIssueData.context.message_id,
-          timestamp: onIssueData.context.timestamp,
-        },
-        message: {
-          issue: {
-            id: onIssueData.message.issue.id,
-            issue_actions: {
-              respondent_actions:
-                onIssueData.message.issue.issue_actions.respondent_actions,
-            },
-            created_at: onIssueData.message.issue.created_at,
-            updated_at: this.currentDate.toISOString(),
-          },
-        },
-      };
-
       const createBug = new PostHttpRequest({
         url: "/on_issue",
         method: "post",
-        data: onIssuePayload,
+        data: onIssueData,
       });
 
       const response: any = await createBug.send();
@@ -116,94 +137,44 @@ class GatewayIssueService {
     const onIssueStatusPayload = {
       context: {
         domain: onIssueStatusData.context.domain,
-        country: "IND",
-        city: "std:080",
-        action: "on_issue",
+        country: onIssueStatusData.context.country,
+        city: onIssueStatusData.context.city,
+        action: "on_issue_status",
         core_version: "1.0.0",
-        bap_id: "abc.interfacingapp.com",
-        bap_uri: "https://abc.buyerapp.com/ondc",
-        bpp_id: "xyz.sellerapp.com",
-        bpp_uri: "https://xyz.sellerapp.com/ondc",
-        transaction_id: "T1",
-        message_id: "M6",
-        timestamp: "2023-01-15T10:15:15.932Z",
+        bap_id: onIssueStatusData.context.bap_id,
+        bap_uri: onIssueStatusData.context.bap_uri,
+        bpp_id: onIssueStatusData.context.bpp_id,
+        bpp_uri: onIssueStatusData.context.bpp_uri,
+        transaction_id: onIssueStatusData.context.transaction_id,
+        message_id: onIssueStatusData.context.message_id,
+        timestamp: onIssueStatusData.context.timestamp,
       },
       message: {
         issue: {
-          id: "I2",
+          id: onIssueStatusData.message.issue.id,
           issue_actions: {
-            respondent_actions: [
-              {
-                respondent_action: "PROCESSING",
-                short_desc: "Complaint is being processed",
-                updated_at: "2023-01-15T10:04:01.812Z",
-                updated_by: {
-                  org: {
-                    name: "xyz.sellerapp.com::ONDC:RET10",
-                  },
-                  contact: {
-                    phone: "9960394039",
-                    email: "transactioncounterpartyapp@tcapp.com",
-                  },
-                  person: {
-                    name: "James Doe",
-                  },
-                },
-                cascaded_level: 1,
-              },
-              {
-                respondent_action: "CASCADED",
-                short_desc: "Complaint cascaded",
-                updated_at: "2023-01-15T10:05:00.267Z",
-                updated_by: {
-                  org: {
-                    name: "xyz.sellerapp.com::nic2004:60232",
-                  },
-                  contact: {
-                    phone: "9960394039",
-                    email: "transactioncounterpartyapp@tcapp.com",
-                  },
-                  person: {
-                    name: "James Doe",
-                  },
-                },
-                cascaded_level: 2,
-              },
-              {
-                respondent_action: "PROCESSING",
-                short_desc: "Complaint is being processed",
-                updated_at: "2023-01-15T10:15:15.932Z",
-                updated_by: {
-                  org: {
-                    name: "lmn.logisticssellerapp.counterpary.com::nic2004:60232",
-                  },
-                  contact: {
-                    phone: "9971394047",
-                    email: "cascadedcounterpartyapp@cascadapp.com",
-                  },
-                  person: {
-                    name: "Jimmy Doe",
-                  },
-                },
-                cascaded_level: 2,
-              },
-            ],
+            respondent_actions:
+              onIssueStatusData.message.issue.issue_actions.respondent_actions,
           },
-          created_at: "2023-01-15T10:00:00.469Z",
-          updated_at: "2023-01-15T10:15:15.932Z",
+          created_at: onIssueStatusData.message.issue.created_at,
+          updated_at: onIssueStatusData.message.issue.updated_at,
         },
       },
     };
 
-    const createBug = new PostHttpRequest({
-      url: "/on_issue_status",
-      method: "post",
-      data: onIssueStatusPayload,
-    });
+    try {
+      const createBug = new PostHttpRequest({
+        url: "/on_issue_status",
+        method: "post",
+        data: onIssueStatusPayload,
+      });
 
-    const response: any = await createBug.send();
+      const response: any = await createBug.send();
 
-    return response;
+      return response;
+    } catch (error) {
+      return error;
+    }
   }
 }
 

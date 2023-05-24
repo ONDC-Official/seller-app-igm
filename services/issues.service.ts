@@ -84,12 +84,13 @@ class IssueService {
   async getAllIssues(req: Request, res: Response) {
     const offset: string = req.query.offset?.toString() ?? "0";
     const limit: string = req.query.limit?.toString() ?? "10";
+
     const query: { offset: number; limit: number } = {
       offset: parseInt(offset, 10),
       limit: parseInt(limit, 10),
     };
 
-    if (req.body.user.organization) {
+    if (req.body?.user?.user?.organization) {
       const specificProviderIssue = await Issue.find({
         "message.issue.order_details.provider_id": req.body.user.organization,
       })
@@ -99,11 +100,13 @@ class IssueService {
         .lean();
 
       if (specificProviderIssue?.length === 0) {
-        res.status(200).send({ message: "There is no issue", issues: [] });
+        return res
+          .status(200)
+          .send({ message: "There is no issue", issues: [] });
       }
     }
 
-    if (req.body.user.user.role === "Super Admin") {
+    if (req.body?.user?.user?.role?.name === "Super Admin") {
       const allIssues = await Issue.find()
         .sort({ "message.issue.created_at": -1 })
         .skip(query.offset * query.limit)
@@ -111,7 +114,9 @@ class IssueService {
         .lean();
 
       if (allIssues?.length === 0) {
-        res.status(200).send({ message: "There is no issue", issues: [] });
+        return res
+          .status(200)
+          .send({ message: "There is no issue", issues: [] });
       }
 
       return res.status(200).send({ success: true, allIssues });
@@ -122,12 +127,12 @@ class IssueService {
       .send({ success: false, message: "You are not authorized" });
   }
 
-  async issue_response({ req, res }: { req: IIssueResponse; res: Response }) {
+  async issue_response(req: Request, res: Response) {
     let on_issue;
     try {
       const data = await dbServices.findIssueWithPathAndValue({
         key: "context.transaction_id",
-        value: req.transaction_id,
+        value: req.body.transaction_id,
       });
 
       if (data.status === 404) {
@@ -135,22 +140,22 @@ class IssueService {
       }
 
       const payload: IIssueResponse = {
-        transaction_id: req.transaction_id,
-        refund_amount: req.refund_amount,
-        long_desc: req.long_desc,
-        respondent_action: req.respondent_action,
-        short_desc: req.short_desc,
+        transaction_id: req.body.transaction_id,
+        refund_amount: req.body.refund_amount,
+        long_desc: req.body.long_desc,
+        respondent_action: req.body.respondent_action,
+        short_desc: req.body.short_desc,
         updated_at: new Date(),
         updated_by: {
           org: {
             name: `${data.context.bpp_id + process.env.DOMAIN}`,
           },
           contact: {
-            phone: req.updated_by.contact.phone,
-            email: req.updated_by.contact.email,
+            phone: req.body.updated_by.contact.phone,
+            email: req.body.updated_by.contact.email,
           },
           person: {
-            name: req.updated_by.person.name,
+            name: req.body.updated_by.person.name,
           },
         },
         cascaded_level: 1,
@@ -178,7 +183,7 @@ class IssueService {
       }
 
       if (on_issue) {
-        await dbServices.getIssueByTransactionId(req.transaction_id);
+        await dbServices.getIssueByTransactionId(req.body.transaction_id);
         // TODO - return send() with on_issue data
         return res.status(200);
       }
@@ -196,11 +201,11 @@ class IssueService {
   }
 
   async getSingleIssue(req: Request, res: Response) {
-    const { transactionId } = req.params;
+    const { issueId } = req.params;
 
     const result = await dbServices.findIssueWithPathAndValue({
-      key: "context.transaction_id",
-      value: transactionId,
+      key: "message.issue.id",
+      value: issueId,
     });
 
     if (result.status === 404) {
