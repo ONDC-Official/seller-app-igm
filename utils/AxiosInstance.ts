@@ -1,12 +1,15 @@
 import axios from "axios";
 
-export const axiosInstanceInternal = axios.create({
-  baseURL: "http://seller-app:3019/",
-  headers: { "Content-Type": "application/json" },
-});
+
+//TODO Changed the URL from ENV
+
+// export const axiosInstanceInternal = axios.create({
+//   baseURL: "http://seller-app:3019/",
+//   headers: { "Content-Type": "application/json" },
+// });
 
 const axiosInstance = axios.create({
-  baseURL: "https://9ad5-115-240-127-98.ngrok-free.app/protocol/v1",
+  baseURL: "http://localhost:8000/api/client",
   headers: { "Content-Type": "application/json" },
 });
 

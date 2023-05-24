@@ -26,11 +26,16 @@ class IssueService {
       if (issue?.status === 404) {
         await Issue.create(req.body);
 
+        const updateIssue = await dbServices.findIssueWithPathAndValue({
+          key: "context.transaction_id",
+          value: req.body.context.transaction_id,
+        });
+
         try {
           await gatewayIssueService.scheduleAJob({
             transaction_id: req.body.context.transaction_id,
             created_at: req.body.message.issue.created_at,
-            payload: issue,
+            payload: updateIssue,
           });
           return res.status(201).send({
             status: 201,

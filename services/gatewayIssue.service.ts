@@ -24,6 +24,7 @@ class GatewayIssueService {
   }) {
     Scheduler.scheduleJob(
       this.startProcessingIssueAfter5Minutes(created_at),
+
       async () => {
         dbServices.addOrUpdateIssueWithKeyValue({
           issueKeyToFind: "context.transaction_id",
