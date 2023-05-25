@@ -30,6 +30,13 @@ class DbServices {
     );
   };
 
+  /**
+   * issue_status
+   * @param {*} issueKeyToFind    key is required for searching
+   * @param {*} issueValueToFind    value for the above key that will help
+   * @param {*} keyPathForUpdating   defining a key where data needs to be added
+   * @param {*} issueSchema   data that need to be added
+   */
   addOrUpdateIssueWithKeyValue = async ({
     issueKeyToFind,
     issueValueToFind,
@@ -49,6 +56,13 @@ class DbServices {
       { upsert: true }
     );
   };
+
+
+    /**
+   * issue_status
+   * @param {*} key  key is required for searching
+   * @param {*} value    value for the above key that will help
+   */
 
   findIssueWithPathAndValue = async ({
     value,

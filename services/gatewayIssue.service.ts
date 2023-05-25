@@ -1,17 +1,22 @@
 import Scheduler from "node-schedule";
 import DbServices from "../utils/DbServices";
 import PostHttpRequest from "../utils/HttpRequest";
-import { IOnIssue } from "../interfaces/on.issue";
-import { IIssue } from "../interfaces/issue";
+// import { IOnIssue } from "../interfaces/on.issue";
+// import { IIssue } from "../interfaces/issue";
+import {
+  IBaseIssue,
+  // OnIssueWithCompmplainentAction,
+  _On_Issue,
+} from "../interfaces/BaseInterface";
+// import axios from "axios";
 
 const dbServices = new DbServices();
 class GatewayIssueService {
   constructor() {
     this.scheduleAJob = this.scheduleAJob.bind(this);
     this.on_issue = this.on_issue.bind(this);
+    this.on_issue_status = this.on_issue_status.bind(this);
   }
-
-  currentDate = new Date();
 
   async scheduleAJob({
     created_at,
@@ -20,13 +25,13 @@ class GatewayIssueService {
   }: {
     created_at: string;
     transaction_id: string;
-    payload: IIssue;
+    payload: IBaseIssue;
   }) {
     Scheduler.scheduleJob(
       this.startProcessingIssueAfter5Minutes(created_at),
 
       async () => {
-        const onIssuePayload: IOnIssue = {
+        const onIssuePayload: _On_Issue = {
           context: {
             domain: payload.context.domain,
             country: payload.context.country,
@@ -67,7 +72,7 @@ class GatewayIssueService {
                 ],
               },
               created_at: payload.message.issue.created_at,
-              updated_at: this.currentDate.toISOString(),
+              updated_at: new Date().toDateString(),
             },
           },
         };
@@ -83,7 +88,7 @@ class GatewayIssueService {
             issueSchema: {
               respondent_action: "PROCESSING",
               short_desc: "We are investigating your concern.",
-              updated_at: this.currentDate,
+              updated_at: new Date(),
               updated_by: {
                 org: {
                   name: "ondc-tech-support-buyer-app.ondc.org::nic2004:52110",
@@ -100,7 +105,7 @@ class GatewayIssueService {
             },
           });
 
-          const response = await this.on_issue(onIssuePayload);
+          const response = await this.on_issue({ onIssueData: onIssuePayload });
 
           return response;
         } catch (error) {
@@ -122,7 +127,7 @@ class GatewayIssueService {
     return newDateString;
   }
 
-  async on_issue(onIssueData: IOnIssue) {
+  async on_issue({ onIssueData }: { onIssueData: any }) {
     try {
       const createBug = new PostHttpRequest({
         url: "/on_issue",
@@ -138,8 +143,8 @@ class GatewayIssueService {
     }
   }
 
-  async on_issue_status(onIssueStatusData: IIssue) {
-    const onIssueStatusPayload = {
+  async on_issue_status(onIssueStatusData: any) {
+    const onIssueStatusPayload: _On_Issue = {
       context: {
         domain: onIssueStatusData.context.domain,
         country: onIssueStatusData.context.country,
@@ -175,6 +180,11 @@ class GatewayIssueService {
       });
 
       const response: any = await createBug.send();
+
+      console.log(
+        "🚀 ~ file: gatewayIssue.service.ts:178 ~ GatewayIssueService ~ on_issue_status ~ response:",
+        response
+      );
 
       return response;
     } catch (error) {
