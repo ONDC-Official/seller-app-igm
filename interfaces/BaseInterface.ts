@@ -1,7 +1,7 @@
 type ChangeFields<T, R> = Omit<T, keyof R> & R;
 
 // use this for /on_issue
-export type _On_Issue = ChangeFields<
+export type OnIssue = ChangeFields<
   IBaseIssue,
   {
     context: Omit<Context, "ttl">;
@@ -34,28 +34,24 @@ export type _On_Issue = ChangeFields<
   }
 >;
 
-export type OnIssueWithCompmplainentAction = ChangeFields<
+// on_issue contains complainent actions
+export type IssueRequest = ChangeFields<
   IBaseIssue,
   {
-    context: Omit<Context, "ttl">;
     message: ChangeFields<
       Message,
       {
-        issue: Omit<
-          Issue,
-          | "order_details"
-          | "issue_type"
-          | "category"
-          | "complainant_info"
-          | "description"
-          | "expected_resolution_time"
-          | "expected_response_time"
-          | "source"
-          | "status"
-          | "sub_category"
-          | "rating"
-          | "resolution"
-          | "resolution_provider"
+        issue: ChangeFields<
+          Omit<Issue, "resolution" | "resolution_provider">,
+          {
+            complainant_info: ChangeFields<
+              ComplainantInfo,
+              {
+                person: Omit<Person, "email">;
+              }
+            >;
+            order_details: Omit<OrderDetails, "state" | "id">;
+          }
         >;
       }
     >;
@@ -64,7 +60,7 @@ export type OnIssueWithCompmplainentAction = ChangeFields<
 
 // use this for /on_issue_status when Seller has RESOLVED the issue
 
-export type _On_Issue_Status_Resoloved = ChangeFields<
+export type OnIssueStatusResoloved = ChangeFields<
   IBaseIssue,
   {
     context: Omit<Context, "ttl">;
@@ -141,7 +137,7 @@ export interface Issue {
   resolution: Resolution;
   resolution_provider: ResolutionProvider;
   created_at: string;
-  updated_at: string;
+  updated_at: Date;
 }
 
 export interface ResolutionProvider {
@@ -194,6 +190,7 @@ export interface ComplainantInfo {
 }
 export interface ComplainantInfoContact {
   phone: string;
+  email: string;
 }
 export interface Person {
   name: string;
@@ -230,7 +227,7 @@ export interface UpdatedBy {
 export interface RespondentAction {
   respondent_action: string;
   short_desc: string;
-  updated_at: string;
+  updated_at: Date;
   updated_by: UpdatedBy;
   cascaded_level: number;
 }

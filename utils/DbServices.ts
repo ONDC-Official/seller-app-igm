@@ -9,28 +9,6 @@ interface IUpdateIssueWithDynamicID {
 
 class DbServices {
   /**
-   * @param {String} transactionId
-   * @param {Object} issueSchema
-   */
-  addOrUpdateIssueWithtransactionId = async (
-    transactionId: string | any,
-    issueSchema: object = {}
-  ) => {
-    return await Issue.updateOne(
-      {
-        "context.transaction_id": transactionId,
-      },
-      {
-        $set: {
-          "message.issue.issue_actions.complainant_actions": issueSchema,
-        },
-      },
-
-      { upsert: true }
-    );
-  };
-
-  /**
    * issue_status
    * @param {*} issueKeyToFind    key is required for searching
    * @param {*} issueValueToFind    value for the above key that will help
@@ -57,8 +35,7 @@ class DbServices {
     );
   };
 
-
-    /**
+  /**
    * issue_status
    * @param {*} key  key is required for searching
    * @param {*} value    value for the above key that will help
@@ -83,33 +60,6 @@ class DbServices {
       };
     }
     return issue;
-  };
-
-  getIssueByTransactionId = async (transactionId: string) => {
-    const issue: any = await Issue.findOne({
-      "context.transaction_id": transactionId,
-    });
-
-    if (!issue) {
-      return {
-        status: 404,
-        name: "NO_RECORD_FOUND_ERROR",
-        message: "Record not found",
-      };
-    } else return issue;
-  };
-  getIssueByIssueId = async (issue_id: string) => {
-    const issue: any = await Issue.findOne({
-      "message.issue.id": issue_id,
-    });
-
-    if (!issue) {
-      return {
-        status: 404,
-        name: "NO_RECORD_FOUND_ERROR",
-        message: "Record not found",
-      };
-    } else return issue;
   };
 }
 export default DbServices;

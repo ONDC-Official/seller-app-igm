@@ -5,11 +5,12 @@ import DbServices from "../utils/DbServices";
 
 import { IIssueResponse } from "../interfaces/issue_response";
 
-import { GatewayIssueService } from "./index.service";
+import GatewayIssueService from "./gatewayIssue.service";
 import {
   IBaseIssue,
-  _On_Issue_Status_Resoloved,
-} from "interfaces/BaseInterface";
+  IssueRequest,
+  OnIssueStatusResoloved,
+} from "../interfaces/BaseInterface";
 
 const gatewayIssueService = new GatewayIssueService();
 
@@ -20,22 +21,34 @@ class IssueService {
     this.createIssue = this.createIssue.bind(this);
   }
 
+  /**
+   * createIssue and hit on_issue api
+   * @param {*} req    HTTP request object
+   * @param {*} res    HTTP response object
+   */
   async createIssue(req: Request, res: Response) {
+    const issuePayload: IssueRequest = req.body;
+
     try {
+      // check if issues already exist
       const issue = await dbServices.findIssueWithPathAndValue({
         key: "context.transaction_id",
-        value: req.body.context.transaction_id,
+        value: issuePayload.context.transaction_id,
       });
 
+      // create new issue if issues does not exist
       if (issue?.status === 404) {
-        await Issue.create(req.body);
+        //creating issue
+        await Issue.create(issuePayload);
 
         try {
+          //schedule a job for sending respondant action processing after 5 min if Provider has not initiated
           await gatewayIssueService.scheduleAJob({
-            transaction_id: req.body.context.transaction_id,
-            created_at: req.body.message.issue.created_at,
-            payload: req.body,
+            transaction_id: issuePayload.context.transaction_id,
+            created_at: issuePayload.message.issue.created_at,
+            payload: issuePayload,
           });
+
           return res.status(201).send({
             status: 201,
             success: true,
@@ -49,30 +62,48 @@ class IssueService {
         }
       }
 
-      await dbServices.addOrUpdateIssueWithKeyValue({
-        issueKeyToFind: "context.transaction_id",
-        issueValueToFind: req.body.context.transaction_id,
-        keyPathForUpdating: "message.issue",
-        issueSchema: {
-          ...issue?.message?.issue,
-          issue_type: req.body.message.issue_type,
-          status: req.body.message.issue.status,
-          issue_actions: {
-            complainant_actions:
-              req.body.message.issue.issue_actions.complainant_actions,
-          },
-          rating: req.body.message.issue.rating,
-        },
-      });
+      // hit on_issue if any issue complainent action contains ESCALTED
+      if (
+        issuePayload.message?.issue.issue_actions.complainant_actions.length !==
+        0
+      ) {
+        for (const complaint of issuePayload.message?.issue.issue_actions
+          .complainant_actions) {
+          if (complaint?.complainant_action === "ESCALATE") {
+            await gatewayIssueService.on_issue({
+              onIssueData: issuePayload,
+            });
+          }
+        }
+      }
 
-      if (req.body.message.issue_type === "GRIEVANCE") {
+      // hit on_issue if any issue complainent action contains GRIEVANCE
+
+      if (issuePayload.message.issue.issue_type === "GRIEVANCE") {
         const issueWithGrivance = await dbServices.findIssueWithPathAndValue({
           key: "context.transaction_id",
-          value: req.body.context.transaction_id,
+          value: issuePayload.context.transaction_id,
         });
 
         gatewayIssueService.on_issue({ onIssueData: issueWithGrivance });
       }
+
+      // keep updating issue with new complainent actions
+      await dbServices.addOrUpdateIssueWithKeyValue({
+        issueKeyToFind: "context.transaction_id",
+        issueValueToFind: issuePayload.context.transaction_id,
+        keyPathForUpdating: "message.issue",
+        issueSchema: {
+          ...issue?.message?.issue,
+          issue_type: issuePayload.message.issue.issue_type,
+          status: issuePayload.message.issue.status,
+          issue_actions: {
+            complainant_actions:
+              issuePayload.message.issue.issue_actions.complainant_actions,
+          },
+          rating: issuePayload.message.issue.rating,
+        },
+      });
 
       logger.info("pushed into database");
 
@@ -89,6 +120,11 @@ class IssueService {
     }
   }
 
+  /**
+   * getAllIssue Endpoint
+   * @param {*} req    HTTP request object
+   * @param {*} res    HTTP response object
+   */
   async getAllIssues(req: Request, res: Response) {
     const offset: string = req.query.offset?.toString() ?? "0";
     const limit: string = req.query.limit?.toString() ?? "10";
@@ -98,10 +134,7 @@ class IssueService {
       limit: parseInt(limit, 10),
     };
 
-    console.log(
-      "req.body?.user?.user?.organization",
-      req.body?.user?.user?.organization
-    );
+    // if organization ID exist in token return specific providers complaints only
     if (req.body?.user?.user?.organization) {
       const specificProviderIssue = await Issue.find({
         "message.issue.order_details.provider_id":
@@ -117,16 +150,14 @@ class IssueService {
           .send({ message: "There is no issue", issues: [] });
       }
 
-      return res
-        .status(200)
-        .send({ success: true, issues: specificProviderIssue });
+      return res.status(200).send({
+        success: true,
+        issues: specificProviderIssue,
+        count: specificProviderIssue?.length,
+      });
     }
 
-    console.log(
-      "req.body?.user?.user?.role?.name",
-      req.body?.user?.user?.organization
-    );
-
+    // return all issues is Super Admin
     if (req.body?.user?.user?.role?.name === "Super Admin") {
       const allIssues = await Issue.find()
         .sort({ "message.issue.created_at": -1 })
@@ -146,11 +177,14 @@ class IssueService {
     return res.status(200).send({ success: true, data: [] });
   }
 
+  /**
+   * Issue_Response Endpoint for Responding to the issue
+   * @param {*} req    HTTP request object
+   * @param {*} res    HTTP response object
+   */
   async issue_response(req: Request, res: Response) {
-    let on_issue;
-    let payloadForResolvedissue: _On_Issue_Status_Resoloved;
+    let payloadForResolvedissue: OnIssueStatusResoloved;
     try {
-      //TODO: check this & or |
       const fetchedIssueFromDataBase: IBaseIssue & {
         status: number;
         name: string;
@@ -175,9 +209,7 @@ class IssueService {
         updated_at: new Date(),
         updated_by: {
           org: {
-            name: `${
-              fetchedIssueFromDataBase.context.bpp_id + process.env.DOMAIN
-            }`,
+            name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
           },
           contact: {
             phone: req.body.updated_by.contact.phone,
@@ -190,6 +222,7 @@ class IssueService {
         cascaded_level: 1,
       };
 
+      // responding with RESOLVED status by Provider
       if (payload.respondent_action === "RESOLVED") {
         payloadForResolvedissue = {
           context: fetchedIssueFromDataBase.context,
@@ -204,11 +237,16 @@ class IssueService {
                     cascaded_level: 1,
                     respondent_action: "RESOLVED",
                     short_desc: payload.short_desc,
-                    updated_at: new Date().toDateString(),
+                    updated_at: new Date(),
                     updated_by: {
-                      contact: { email: "", phone: "" },
-                      org: { name: "" },
-                      person: { name: "" },
+                      contact: {
+                        email: payload.updated_by.contact.email,
+                        phone: payload.updated_by.contact.phone,
+                      },
+                      org: {
+                        name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                      },
+                      person: { name: payload.updated_by.person.name },
                     },
                   },
                 ],
@@ -224,30 +262,26 @@ class IssueService {
                   type: "TRANSACTION-COUNTERPARTY-NP",
                   organization: {
                     org: {
-                      name: "sellerapp.com::ONDC:RET10",
+                      name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
                     },
                     contact: {
-                      phone: "9059304940",
-                      email: "email@resolutionproviderorg.com",
+                      email: payload.updated_by.contact.email,
+                      phone: payload.updated_by.contact.phone,
                     },
-                    person: {
-                      name: "resolution provider org contact person name",
-                    },
+                    person: { name: payload.updated_by.person.name },
                   },
                   resolution_support: {
                     chat_link: "http://chat-link/respondent",
                     contact: {
-                      phone: "9949595059",
-                      email: "respondantemail@resolutionprovider.com",
+                      email: payload.updated_by.contact.email,
+                      phone: payload.updated_by.contact.phone,
                     },
                     gros: [
                       {
-                        person: {
-                          name: "Sam D",
-                        },
+                        person: { name: payload.updated_by.person.name },
                         contact: {
-                          phone: "9605960796",
-                          email: "email@gro.com",
+                          email: payload.updated_by.contact.email,
+                          phone: payload.updated_by.contact.phone,
                         },
                         gro_type: "TRANSACTION-COUNTERPARTY-NP-GRO",
                       },
@@ -259,26 +293,10 @@ class IssueService {
           },
         };
 
-        on_issue = await gatewayIssueService.on_issue_status(
-          payloadForResolvedissue
-        );
-
-        //TODO: return here
-        return on_issue;
+        await gatewayIssueService.on_issue_status(payloadForResolvedissue);
       }
 
-      if (
-        fetchedIssueFromDataBase?.message?.issue.status === "OPEN" ||
-        fetchedIssueFromDataBase?.message?.issue.status === "ESCALATE"
-      ) {
-        on_issue = await gatewayIssueService.on_issue_status(
-          fetchedIssueFromDataBase
-        );
-      }
-
-      // TODO - return send() with on_issue data
-
-      await dbServices.getIssueByTransactionId(req.body.transaction_id);
+      // updating the database with latest issue_actions
       dbServices.addOrUpdateIssueWithKeyValue({
         issueKeyToFind: "context.transaction_id",
         issueValueToFind: payload.transaction_id,
@@ -294,11 +312,9 @@ class IssueService {
         ],
       });
 
-      // TODO - change on_issue according to the response you will get
-
       return res
-        .status(500)
-        .json({ error: true, message: on_issue || "Something went wrong" });
+        .status(200)
+        .json({ success: true, message: "Issue has been updated" });
     } catch (err) {
       return res
         .status(500)
@@ -306,6 +322,11 @@ class IssueService {
     }
   }
 
+  /**
+   * getIssue Endpoint to a issue with issue ID
+   * @param {*} req    HTTP request object
+   * @param {*} res    HTTP response object
+   */
   async getSingleIssue(req: Request, res: Response) {
     const { issueId } = req.params;
 
@@ -318,27 +339,35 @@ class IssueService {
       return res.status(200).send({ message: "There is no issue", issues: [] });
     }
 
-    return res.status(200).send({ success: true, result });
+    return res.status(200).send({ success: true, data: result });
   }
 
+  /**
+   * Issue_Status and on_issue_status Endpoint for updates
+   * @param {*} req    HTTP request object
+   * @param {*} res    HTTP response object
+   */
   async issueStatus(req: Request, res: Response) {
     try {
       if (!req?.body?.message) return;
 
       const issue_id = req.body.message.issue_id;
 
-      const result = await dbServices.getIssueByIssueId(issue_id);
+      const result = await dbServices.findIssueWithPathAndValue({
+        key: "message.issue.id",
+        value: issue_id,
+      });
+
+      if (result.status === 404) {
+        return res.status(404).json({
+          error: true,
+          message: result.message || "Something went wrong",
+        });
+      }
 
       const response = await gatewayIssueService.on_issue_status(result);
 
-      //TODO: check response and act according now not tested yet
-      if (response) {
-        return res.status(200).json({ success: true, data: response });
-      }
-
-      return res
-        .status(500)
-        .json({ error: true, message: "Something went wrong" });
+      return res.status(200).json({ success: true, data: response });
     } catch (e) {
       return res
         .status(500)

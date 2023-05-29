@@ -1,14 +1,7 @@
 import Scheduler from "node-schedule";
 import DbServices from "../utils/DbServices";
 import PostHttpRequest from "../utils/HttpRequest";
-// import { IOnIssue } from "../interfaces/on.issue";
-// import { IIssue } from "../interfaces/issue";
-import {
-  IBaseIssue,
-  // OnIssueWithCompmplainentAction,
-  _On_Issue,
-} from "../interfaces/BaseInterface";
-// import axios from "axios";
+import { IssueRequest, OnIssue } from "../interfaces/BaseInterface";
 
 const dbServices = new DbServices();
 class GatewayIssueService {
@@ -18,6 +11,13 @@ class GatewayIssueService {
     this.on_issue_status = this.on_issue_status.bind(this);
   }
 
+  /**
+   * Schedule a job for Processing issue after 5 minute
+   * @param {*} created_at    Date and Time when issue created
+   * @param {*} transaction_id    issue Transaction ID
+   * @param {*} payload   for On_issue Payload Object
+   */
+
   async scheduleAJob({
     created_at,
     transaction_id,
@@ -25,13 +25,13 @@ class GatewayIssueService {
   }: {
     created_at: string;
     transaction_id: string;
-    payload: IBaseIssue;
+    payload: IssueRequest;
   }) {
     Scheduler.scheduleJob(
       this.startProcessingIssueAfter5Minutes(created_at),
 
       async () => {
-        const onIssuePayload: _On_Issue = {
+        const onIssuePayload: OnIssue = {
           context: {
             domain: payload.context.domain,
             country: payload.context.country,
@@ -54,10 +54,10 @@ class GatewayIssueService {
                   {
                     respondent_action: "PROCESSING",
                     short_desc: "We are investigating your concern.",
-                    updated_at: "",
+                    updated_at: new Date(),
                     updated_by: {
                       org: {
-                        name: "ondc-tech-support-buyer-app.ondc.org::nic2004:52110",
+                        name: `${process.env.BPP_URI}}::nic2004:52110`,
                       },
                       contact: {
                         phone: "6239083807",
@@ -72,12 +72,10 @@ class GatewayIssueService {
                 ],
               },
               created_at: payload.message.issue.created_at,
-              updated_at: new Date().toDateString(),
+              updated_at: new Date(),
             },
           },
         };
-
-        //TODO: update database conditionally once you get response from on_issue api
 
         try {
           dbServices.addOrUpdateIssueWithKeyValue({
@@ -91,7 +89,7 @@ class GatewayIssueService {
               updated_at: new Date(),
               updated_by: {
                 org: {
-                  name: "ondc-tech-support-buyer-app.ondc.org::nic2004:52110",
+                  name: `${process.env.BPP_URI}}::nic2004:52110`,
                 },
                 contact: {
                   phone: "6239083807",
@@ -115,17 +113,27 @@ class GatewayIssueService {
     );
   }
 
+  /**
+   * Convert ISO formatted date and return new date with added 5 mintue
+   * @param {*} dateString    Date and Time "2023-05-28T15:30:30.349Z"
+   */
+
   startProcessingIssueAfter5Minutes(dateString: string) {
     const dateObj = new Date(dateString);
 
     // Add 5 minutes to the Date object
-    dateObj.setTime(dateObj.getTime() + 1 * 60000); // 5 minutes = 5 * 60 seconds * 1000 milliseconds
+    dateObj.setTime(dateObj.getTime() + 0.1 * 60000); // 5 minutes = 5 * 60 seconds * 1000 milliseconds
 
     // Convert the new Date object back to the ISO 8601 format
     const newDateString = dateObj.toISOString();
 
     return newDateString;
   }
+
+  /**
+   * On_issue Api
+   * @param {*} onIssueData    payload object
+   */
 
   async on_issue({ onIssueData }: { onIssueData: any }) {
     try {
@@ -143,8 +151,12 @@ class GatewayIssueService {
     }
   }
 
+  /**
+   * On_issue_status Api
+   * @param {*} onIssueStatusData  payload object
+   */
   async on_issue_status(onIssueStatusData: any) {
-    const onIssueStatusPayload: _On_Issue = {
+    const onIssueStatusPayload: OnIssue = {
       context: {
         domain: onIssueStatusData.context.domain,
         country: onIssueStatusData.context.country,
@@ -180,11 +192,6 @@ class GatewayIssueService {
       });
 
       const response: any = await createBug.send();
-
-      console.log(
-        "🚀 ~ file: gatewayIssue.service.ts:178 ~ GatewayIssueService ~ on_issue_status ~ response:",
-        response
-      );
 
       return response;
     } catch (error) {

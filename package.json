@@ -1,10 +1,10 @@
 {
-  "name": "bugzilla-service",
+  "name": "seller-igm-service",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npm run tsc",
+    "build": "npm run tsc ",
     "start": "./bin/start",
     "start:prod": "node ./dist/index.js",
     "start:dev": "ts-node-dev ./index.ts",
@@ -20,14 +20,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://oauth2:glpat-sJarDFfhM3H9yzzZ-2wt@gitlab.com/wil-internal-projects/bugzilla-service.git"
+    "url": "https://github.com/robin-chauhan1/seller-app-igm.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://gitlab.com/wil-internal-projects/bugzilla-service/issues"
+    "url": "https://github.com/robin-chauhan1/seller-app-igm.git"
   },
-  "homepage": "https://gitlab.com/wil-internal-projects/bugzilla-service#readme",
+  "homepage": "https://github.com/robin-chauhan1/seller-app-igm.git",
   "dependencies": {
     "axios": "^1.4.0",
     "body-parser": "^1.20.2",

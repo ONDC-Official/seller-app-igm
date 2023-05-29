@@ -1,5 +1,4 @@
 import mongoose, { Schema } from "mongoose";
-
 const issueSchema = new Schema({
   context: {
     domain: { type: String },
@@ -83,7 +82,7 @@ const issueSchema = new Schema({
                 name: { type: String },
               },
               contact: {
-                phone: { type: Number },
+                phone: { type: String },
                 email: { type: String },
               },
               person: {
@@ -105,7 +104,7 @@ const issueSchema = new Schema({
                 name: { type: String },
               },
               contact: {
-                phone: { type: Number },
+                phone: { type: String },
                 email: { type: String },
               },
               person: {
@@ -120,7 +119,6 @@ const issueSchema = new Schema({
         type: String,
         enum: ["THUMBS-UP", "THUMBS-DOWN"],
       },
-
       resolution_provider: {
         respondent_info: {
           type: {
@@ -136,7 +134,7 @@ const issueSchema = new Schema({
               name: { type: String },
             },
             contact: {
-              phone: { type: Number },
+              phone: { type: String },
               email: { type: String },
             },
             person: {
@@ -146,7 +144,7 @@ const issueSchema = new Schema({
           resolution_support: {
             chat_link: { type: String },
             contact: {
-              phone: { type: Number },
+              phone: { type: String },
               email: { type: String },
             },
             gros: [
@@ -155,7 +153,7 @@ const issueSchema = new Schema({
                   name: { type: String },
                 },
                 contact: {
-                  phone: { type: Number },
+                  phone: { type: String },
                   email: { type: String },
                 },
                 gro_type: {
@@ -171,7 +169,6 @@ const issueSchema = new Schema({
           },
         },
       },
-
       resolution: {
         short_desc: { type: String },
         long_desc: { type: String },
@@ -181,11 +178,9 @@ const issueSchema = new Schema({
         },
         refund_amount: { type: String },
       },
-
       created_at: { type: Date },
       updated_at: { type: Date },
     },
   },
 });
-
 export const Issue = mongoose.model("Issue", issueSchema);

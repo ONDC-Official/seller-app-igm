@@ -20,19 +20,6 @@ class IssueController {
     }
   }
 
-  async onIssueStatus(req: Request, res: Response, next: NextFunction) {
-    try {
-      console.log(
-        "🚀 ~ file: issue.controller.ts:24 ~ IssueController ~ onIssueStatus ~ req:",
-        req.body
-      );
-
-      return res.status(200).send({ success: true });
-    } catch (err) {
-      return next(err);
-    }
-  }
-
   /**
    * issue_status
    * @param {*} req    HTTP request object
