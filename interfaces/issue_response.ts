@@ -6,6 +6,7 @@ export interface IIssueResponse {
   short_desc: string;
   updated_at: Date;
   cascaded_level: number;
+  action_triggered:string
   updated_by: {
     org: {
       name: string;

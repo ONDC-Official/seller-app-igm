@@ -26,6 +26,7 @@ const issueSchema = new Schema({
         },
         contact: {
           phone: { type: String },
+          email: { type: String },
         },
       },
       order_details: {
@@ -71,50 +72,7 @@ const issueSchema = new Schema({
         enum: ["OPEN", "CLOSE", "ESCALATE"],
       },
       issue_type: { type: String, enum: ["ISSUE", "GRIEVANCE", "DISPUTE"] },
-      issue_actions: {
-        complainant_actions: [
-          {
-            complainant_action: { type: String },
-            short_desc: { type: String },
-            updated_at: { type: Date },
-            updated_by: {
-              org: {
-                name: { type: String },
-              },
-              contact: {
-                phone: { type: String },
-                email: { type: String },
-              },
-              person: {
-                name: { type: String },
-              },
-            },
-          },
-        ],
-        respondent_actions: [
-          {
-            respondent_action: {
-              type: String,
-              enum: ["PROCESSING", "CASCADED", "RESOLVED", "NEED-MORE-INFO"],
-            },
-            short_desc: { type: String },
-            updated_at: { type: Date },
-            updated_by: {
-              org: {
-                name: { type: String },
-              },
-              contact: {
-                phone: { type: String },
-                email: { type: String },
-              },
-              person: {
-                name: { type: String },
-              },
-            },
-            cascaded_level: { type: Number },
-          },
-        ],
-      },
+      issue_actions: Object,
       rating: {
         type: String,
         enum: ["THUMBS-UP", "THUMBS-DOWN"],
@@ -174,7 +132,7 @@ const issueSchema = new Schema({
         long_desc: { type: String },
         action_triggered: {
           type: String,
-          enum: ["REFUND", "REPLACEMENT", "CANCEL", "NO-ACTION"],
+          enum: ["RESOLVED", "REFUND", "REPLACEMENT", "CASCADED", "NO-ACTION"],
         },
         refund_amount: { type: String },
       },

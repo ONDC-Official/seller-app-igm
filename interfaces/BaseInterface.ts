@@ -34,6 +34,36 @@ export type OnIssue = ChangeFields<
   }
 >;
 
+// IntialIssue for creating issue initial when we get /issue
+
+export type InitialIssue = ChangeFields<
+  IBaseIssue,
+  {
+    context: Omit<Context, "ttl">;
+    message: ChangeFields<
+      Message,
+      {
+        issue: Omit<
+          Issue,
+          | "order_details"
+          | "issue_type"
+          | "category"
+          | "complainant_info"
+          | "description"
+          | "expected_resolution_time"
+          | "expected_response_time"
+          | "source"
+          | "status"
+          | "sub_category"
+          | "rating"
+          | "resolution"
+          | "resolution_provider"
+        >;
+      }
+    >;
+  }
+>;
+
 // on_issue contains complainent actions
 export type IssueRequest = ChangeFields<
   IBaseIssue,
@@ -44,13 +74,7 @@ export type IssueRequest = ChangeFields<
         issue: ChangeFields<
           Omit<Issue, "resolution" | "resolution_provider">,
           {
-            complainant_info: ChangeFields<
-              ComplainantInfo,
-              {
-                person: Omit<Person, "email">;
-              }
-            >;
-            order_details: Omit<OrderDetails, "state" | "id">;
+            order_details: Omit<OrderDetails, "id">;
           }
         >;
       }
@@ -108,7 +132,7 @@ export interface Context {
   bpp_uri: string;
   transaction_id: string;
   message_id: string;
-  timestamp: string;
+  timestamp: Date;
   ttl: string;
 }
 export interface Message {
@@ -134,7 +158,7 @@ export interface Issue {
   issue_type: string;
   issue_actions: IssueActions;
   rating?: Rating;
-  resolution: Resolution;
+  resolution: Resolution | ResolutionWithoutRefund;
   resolution_provider: ResolutionProvider;
   created_at: string;
   updated_at: Date;
@@ -180,8 +204,14 @@ export interface RespondentInfo {
 export interface Resolution {
   short_desc: string;
   long_desc: string;
-  action_triggered: string;
+  action_triggered: "REFUND";
   refund_amount: string;
+}
+
+export interface ResolutionWithoutRefund {
+  short_desc: string;
+  long_desc: string;
+  action_triggered: "RESOLVED" | "REPLACE" | "NO-ACTION" | "CASCADED" | string;
 }
 
 export interface ComplainantInfo {

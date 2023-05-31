@@ -21,7 +21,6 @@ const verifyToken = () => {
         next();
       }
     } catch (error: any) {
-      console.log(error.message);
       res.status(401).send({ error: true, message: error.message });
     }
   };
