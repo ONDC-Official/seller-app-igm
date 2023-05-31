@@ -8,9 +8,6 @@ const issueController = new IssueController();
 
 router.post("/issue", issueController.createIssue);
 
-//test
-router.post("/on_issue", issueController.on_issue);
-
 router.get("/all-issue/", authentication(), issueController.getAllIssues);
 
 router.get(
@@ -24,7 +21,5 @@ router.post(
   issueController.issue_response
 );
 router.post("/issue_status", issueController.issue_status);
-
-router.post("/on_issue_status", issueController.on_issue_status);
 
 export default router;
