@@ -339,10 +339,16 @@ class IssueService {
             .send({ message: "There is no issue", issues: [] });
         }
 
-        return res.status(200).send({ success: true, allIssues });
+        return res
+          .status(200)
+          .send({
+            success: true,
+            issues: allIssues,
+            count: allIssues?.length,
+          });
       }
 
-      return res.status(200).send({ success: true, data: [] });
+      return res.status(200).send({ success: true, issues: [] });
     } catch (err) {
       return res.status(400).json({
         error: true,
@@ -688,10 +694,10 @@ class IssueService {
     });
 
     if (result.status === 404) {
-      return res.status(200).send({ message: "There is no issue", issues: [] });
+      return res.status(200).send({ message: "There is no issue", issue: [] });
     }
 
-    return res.status(200).send({ success: true, data: result });
+    return res.status(200).send({ success: true, issue: result });
   }
 
   /**
