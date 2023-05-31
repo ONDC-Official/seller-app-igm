@@ -1,17 +1,11 @@
 import axios from "axios";
+import dotenv from "dotenv";
 
-//TODO Changed the URL from ENV
-// const axiosInstance = axios.create({
-//   baseURL: "http://localhost:8001/api/client",
-//   headers: { "Content-Type": "application/json" },
-// });
+dotenv.config();
+
 const axiosInstance = axios.create({
-  baseURL: "https://7994-115-240-127-98.ngrok-free.app/protocol/v1",
+  baseURL: process.env.PROTOCOL_BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
-// const axiosInstance = axios.create({
-//   baseURL: `${process.env.BPP_URI}/protocol/v1`,
-//   headers: { "Content-Type": "application/json" },
-// });
 
 export default axiosInstance;

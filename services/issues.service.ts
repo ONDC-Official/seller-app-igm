@@ -339,13 +339,11 @@ class IssueService {
             .send({ message: "There is no issue", issues: [] });
         }
 
-        return res
-          .status(200)
-          .send({
-            success: true,
-            issues: allIssues,
-            count: allIssues?.length,
-          });
+        return res.status(200).send({
+          success: true,
+          issues: allIssues,
+          count: allIssues?.length,
+        });
       }
 
       return res.status(200).send({ success: true, issues: [] });
