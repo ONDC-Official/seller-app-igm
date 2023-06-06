@@ -32,12 +32,7 @@ const issueSchema = new Schema({
       order_details: {
         id: { type: String },
         state: { type: String },
-        items: [
-          {
-            id: { type: String },
-            quantity: { type: Number },
-          },
-        ],
+        items: Object,
         fulfillments: [
           {
             id: { type: String },
@@ -45,6 +40,7 @@ const issueSchema = new Schema({
           },
         ],
         provider_id: { type: String },
+        provider_name: { type: String },
         order_created: { type: Date },
         order_modified_on: { type: Date },
       },

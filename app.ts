@@ -1,7 +1,6 @@
 import * as dotenv from "dotenv";
 import express, { Application, Request, Response } from "express";
 import issueRoutes from "./routes/issue.routes";
-// import path from "path";
 
 dotenv.config();
 

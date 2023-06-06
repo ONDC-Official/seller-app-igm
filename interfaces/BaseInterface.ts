@@ -36,34 +36,6 @@ export type OnIssue = ChangeFields<
 
 // IntialIssue for creating issue initial when we get /issue
 
-export type InitialIssue = ChangeFields<
-  IBaseIssue,
-  {
-    context: Omit<Context, "ttl">;
-    message: ChangeFields<
-      Message,
-      {
-        issue: Omit<
-          Issue,
-          | "order_details"
-          | "issue_type"
-          | "category"
-          | "complainant_info"
-          | "description"
-          | "expected_resolution_time"
-          | "expected_response_time"
-          | "source"
-          | "status"
-          | "sub_category"
-          | "rating"
-          | "resolution"
-          | "resolution_provider"
-        >;
-      }
-    >;
-  }
->;
-
 // on_issue contains complainent actions
 export type IssueRequest = ChangeFields<
   IBaseIssue,
@@ -289,6 +261,7 @@ export interface OrderDetails {
   items: Item[];
   fulfillments: Fulfillment[];
   provider_id: string;
+  provider_name: string;
 }
 export interface Fulfillment {
   id: string;
@@ -296,6 +269,7 @@ export interface Fulfillment {
 }
 export interface Item {
   id: string;
+  product_name: string;
   quantity: number;
 }
 export interface Source {

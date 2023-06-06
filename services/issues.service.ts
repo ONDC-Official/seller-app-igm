@@ -8,15 +8,18 @@ import { IIssueResponse } from "../interfaces/issue_response";
 import GatewayIssueService from "./gatewayIssue.service";
 import {
   IBaseIssue,
-  InitialIssue,
   IssueRequest,
+  Item,
   OnIssue,
   OnIssueStatusResoloved,
 } from "../interfaces/BaseInterface";
-
-const gatewayIssueService = new GatewayIssueService();
+import BugzillaService from "./bugzilla.service";
 
 const dbServices = new DbServices();
+
+const bugzillaService = new BugzillaService();
+
+const gatewayIssueService = new GatewayIssueService();
 
 class IssueService {
   scheduleJob: boolean = true;
@@ -42,7 +45,33 @@ class IssueService {
 
       // create new issue if issues does not exist
       if (issue?.status === 404) {
-        const createIssuePayload: InitialIssue = {
+        const organizationDetails = await dbServices.findOrganizationWithId({
+          organizationId: issuePayload.message.issue.order_details.provider_id,
+        });
+
+        const itemIds = issuePayload?.message?.issue?.order_details.items.map(
+          (item: Item) => item?.id
+        );
+
+        const productsDetails = await dbServices.findProductWithItemId({
+          itemIds: itemIds,
+        });
+
+        const finalpayloadForItems =
+          issuePayload?.message?.issue?.order_details?.items.map(
+            (item: Item) => {
+              const matchingItem = productsDetails?.find(
+                (prodcut: any) => prodcut?.id === item?.id
+              );
+
+              if (matchingItem) {
+                item.product_name = matchingItem?.productName;
+              }
+              return item;
+            }
+          );
+
+        const createIssuePayload: IssueRequest = {
           context: {
             ...issuePayload.context,
             timestamp: new Date(),
@@ -52,6 +81,13 @@ class IssueService {
           message: {
             issue: {
               ...issuePayload.message.issue,
+
+              order_details: {
+                ...issuePayload.message.issue.order_details,
+                provider_name: organizationDetails.name,
+                items: finalpayloadForItems,
+              },
+
               issue_actions: {
                 complainant_actions:
                   issuePayload.message.issue.issue_actions.complainant_actions,
@@ -66,6 +102,36 @@ class IssueService {
         try {
           //schedule a job for sending respondant action processing after 5 min if Provider has not initiated
 
+          const updatedIssueForBugzilla: IBaseIssue =
+            await dbServices.findIssueWithPathAndValue({
+              key: "context.transaction_id",
+              value: issuePayload.context.transaction_id,
+            });
+
+          const bugzillaResponse = await bugzillaService.createIssueInBugzilla({
+            issue: {
+              transaction_id: updatedIssueForBugzilla?.context?.transaction_id,
+              summary:
+                updatedIssueForBugzilla?.message?.issue?.description?.long_desc,
+              bpp_id: updatedIssueForBugzilla?.context?.bap_id,
+              bpp_name: updatedIssueForBugzilla.context.bap_uri,
+              attachments:
+                updatedIssueForBugzilla?.message?.issue?.description?.images,
+              alias: updatedIssueForBugzilla?.context?.transaction_id,
+              product:
+                updatedIssueForBugzilla?.message?.issue?.order_details?.items[0]
+                  ?.product_name,
+              action: updatedIssueForBugzilla?.message?.issue?.issue_actions,
+            },
+            issue_Actions:
+              updatedIssueForBugzilla?.message?.issue?.issue_actions,
+          });
+
+          console.log(
+            "🚀 ~ file: issues.service.ts:331 ~ IssueService ~ createIssue ~ bugzillaResponse:",
+            bugzillaResponse
+          );
+          // }
           await gatewayIssueService.scheduleAJob({
             transaction_id: issuePayload.context.transaction_id,
             created_at: issuePayload.message.issue.created_at,
@@ -251,6 +317,27 @@ class IssueService {
         }
       }
 
+      if (process.env.BUGZILLA_API_KEY) {
+        const bugzillaResponse = await bugzillaService.createIssueInBugzilla({
+          issue: {
+            transaction_id: issue?.context?.transaction_id,
+            summary: issue?.message?.issue?.description.long_desc,
+            bpp_id: issue?.context?.bap_id,
+            bpp_name: issue?.context?.bap_uri,
+            attachments: issue?.message?.issue?.description?.images,
+            alias: issue?.context?.transaction_id,
+            product:
+              issue?.message?.issue?.order_details?.items[0]?.product_name,
+            action: issue?.message?.issue?.issue_actions,
+          },
+          issue_Actions: issue.message.issue.issue_actions,
+        });
+
+        console.log(
+          "🚀 ~ file: issues.service.ts:331 ~ IssueService ~ createIssue ~ bugzillaResponse:",
+          bugzillaResponse
+        );
+      }
       // keep updating issue with new complainent actions
       await dbServices.addOrUpdateIssueWithKeyValue({
         issueKeyToFind: "context.transaction_id",
@@ -280,6 +367,10 @@ class IssueService {
         },
       });
     } catch (error: any) {
+      console.log(
+        "🚀 ~ file: issues.service.ts:390 ~ IssueService ~ createIssue ~ error:",
+        error
+      );
       logger.error(error);
       return res
         .status(500)
@@ -599,7 +690,6 @@ class IssueService {
       });
 
       if (response?.data.message?.ack?.status === "ACK") {
-        this.scheduleJob = true;
         await dbServices.addOrUpdateIssueWithKeyValue({
           issueKeyToFind: "context.transaction_id",
           issueValueToFind: payload.transaction_id,
@@ -652,6 +742,17 @@ class IssueService {
             },
             updated_at: new Date(),
           },
+        });
+
+        await bugzillaService.updateIssueInBugzilla({
+          issue_actions: {
+            ...fetchedIssueFromDataBase.message.issue.issue_actions,
+            respondent_actions:
+              payloadForResolvedissue.message.issue.issue_actions
+                .respondent_actions,
+          },
+          resolved: true,
+          transaction_id: fetchedIssueFromDataBase.context.transaction_id,
         });
 
         return res.status(200).send({

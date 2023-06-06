@@ -1,4 +1,6 @@
+import { Organization } from "../Model/organization";
 import { Issue } from "../Model/issue";
+import { Product } from "../Model/product";
 
 interface IUpdateIssueWithDynamicID {
   issueKeyToFind?: "context.transaction_id";
@@ -60,6 +62,38 @@ class DbServices {
       };
     }
     return issue;
+  };
+
+  findOrganizationWithId = async ({
+    organizationId,
+  }: {
+    organizationId: string;
+  }) => {
+    const organization: any = await Organization.findOne({
+      _id: organizationId,
+    });
+
+    if (!organization) {
+      return {
+        status: 404,
+        name: "NO_RECORD_FOUND_ERROR",
+        message: "Record not found",
+      };
+    }
+    return organization;
+  };
+
+  findProductWithItemId = async ({ itemIds }: { itemIds: string[] }) => {
+    const products: any = await Product.find({ _id: { $in: itemIds } });
+
+    if (!products) {
+      return {
+        status: 404,
+        name: "NO_RECORD_FOUND_ERROR",
+        message: "Record not found",
+      };
+    }
+    return products;
   };
 }
 export default DbServices;
