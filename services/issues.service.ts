@@ -2,8 +2,10 @@ import { Request, Response } from "express";
 import { logger } from "../shared/logger";
 import { Issue } from "../Model/issue";
 import DbServices from "../utils/DbServices";
-
+import Scheduler from "node-schedule";
 import { IIssueResponse } from "../interfaces/issue_response";
+
+import { v4 as uuid } from "uuid";
 
 import GatewayIssueService from "./gatewayIssue.service";
 import {
@@ -14,6 +16,7 @@ import {
   OnIssueStatusResoloved,
 } from "../interfaces/BaseInterface";
 import BugzillaService from "./bugzilla.service";
+import { ComplainantAction } from "../interfaces/BaseInterface";
 
 const dbServices = new DbServices();
 
@@ -26,6 +29,12 @@ class IssueService {
 
   constructor() {
     this.createIssue = this.createIssue.bind(this);
+  }
+
+  hasClosedAction(array: any) {
+    return array.some(
+      (item: ComplainantAction) => item.complainant_action === "CLOSED"
+    );
   }
 
   /**
@@ -121,7 +130,6 @@ class IssueService {
               product:
                 updatedIssueForBugzilla?.message?.issue?.order_details?.items[0]
                   ?.product_name,
-              action: updatedIssueForBugzilla?.message?.issue?.issue_actions,
             },
             issue_Actions:
               updatedIssueForBugzilla?.message?.issue?.issue_actions,
@@ -132,12 +140,27 @@ class IssueService {
             bugzillaResponse
           );
           // }
-          await gatewayIssueService.scheduleAJob({
-            transaction_id: issuePayload.context.transaction_id,
-            created_at: issuePayload.message.issue.created_at,
-            payload: issuePayload,
-            scheduleJob: this.scheduleJob,
-          });
+          console.log(
+            "🚀 ~ file: issues.service.ts:141 ~ IssueService ~ createIssue ~  this.scheduleJob:",
+            this.scheduleJob
+          );
+
+          const job = Scheduler.scheduleJob(
+            gatewayIssueService.startProcessingIssueAfter5Minutes(
+              issuePayload.message.issue.created_at
+            ),
+
+            async () => {
+              gatewayIssueService.scheduleAJob({
+                payload: issuePayload,
+                transaction_id: issuePayload.context.transaction_id,
+              });
+            }
+          );
+
+          if (!this.scheduleJob) {
+            job.cancel();
+          }
 
           return res.status(201).send({
             status: 201,
@@ -209,13 +232,26 @@ class IssueService {
                 issueSchema: {
                   ...issue?.message?.issue,
                   issue_actions: {
-                    ...issue.message.issue.issue_actions,
+                    complainant_actions:
+                      issuePayload.message.issue.issue_actions
+                        .complainant_actions,
                     respondent_actions:
                       on_issue_payload.message.issue.issue_actions
                         .respondent_actions,
                   },
                 },
               });
+
+              bugzillaService.updateIssueInBugzilla({
+                resolved: false,
+                transaction_id: issue?.context?.transaction_id,
+                issue_actions: {
+                  ...issue.message.issue.issue_actions,
+                  ...issuePayload.message.issue.issue_actions,
+                  ...on_issue_payload.message.issue.issue_actions,
+                },
+              });
+
               return res.status(200).send({
                 context: null,
                 message: {
@@ -229,115 +265,28 @@ class IssueService {
         }
       }
 
-      // hit on_issue if any issue complainent action contains GRIEVANCE
-
-      if (
-        issuePayload.message.issue.issue_type === "GRIEVANCE" &&
-        issuePayload.message.issue.status !== "CLOSED"
-      ) {
-        const on_issue_payload: OnIssue = {
-          context: {
-            ...issuePayload.context,
-            action: "on_issue",
-            core_version: "1.0.0",
+      if (this.hasClosedAction(issuePayload.message?.issue.issue_actions)) {
+        bugzillaService.updateIssueInBugzilla({
+          resolved: true,
+          transaction_id: issue?.context?.transaction_id,
+          issue_actions: {
+            ...issue.message.issue.issue_actions,
+            ...issuePayload.message.issue.issue_actions,
           },
-          message: {
-            issue: {
-              ...issuePayload.message.issue,
-              issue_actions: {
-                respondent_actions: [
-                  ...issuePayload.message.issue.issue_actions
-                    .respondent_actions,
-                  {
-                    respondent_action: "PROCESSING",
-                    short_desc: "We are looking into your concern.",
-                    updated_at: new Date(),
-                    updated_by: {
-                      org: {
-                        name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
-                      },
-                      contact: {
-                        phone: "9876543210",
-                        email: "Rishabhnand.singh@ondc.org",
-                      },
-                      person: {
-                        name: "Rishabhnand Singh",
-                      },
-                    },
-                    cascaded_level: 1,
-                  },
-                ],
-              },
-            },
-          },
-        };
-
-        const response: any = await gatewayIssueService.on_issue(
-          on_issue_payload
-        );
-
-        if (response?.data.message?.ack?.status === "ACK") {
-          await dbServices.addOrUpdateIssueWithKeyValue({
-            issueKeyToFind: "context.transaction_id",
-            issueValueToFind: issuePayload.context.transaction_id,
-            keyPathForUpdating: "message.issue",
-            issueSchema: {
-              ...issue?.message?.issue,
-              issue_actions: {
-                ...issue.message.issue.issue_actions,
-                respondent_actions:
-                  on_issue_payload.message.issue.issue_actions
-                    .respondent_actions,
-              },
-            },
-          });
-
-          await dbServices.addOrUpdateIssueWithKeyValue({
-            issueKeyToFind: "context.transaction_id",
-            issueValueToFind: issuePayload.context.transaction_id,
-            keyPathForUpdating: "message.issue",
-            issueSchema: {
-              ...issue?.message?.issue,
-              issue_actions: {
-                ...issuePayload.message.issue.issue_actions,
-                respondent_actions:
-                  on_issue_payload.message.issue.issue_actions
-                    .respondent_actions,
-              },
-            },
-          });
-          return res.status(200).send({
-            context: null,
-            message: {
-              ack: {
-                status: "ACK",
-              },
-            },
-          });
-        }
+        });
       }
 
       if (process.env.BUGZILLA_API_KEY) {
-        const bugzillaResponse = await bugzillaService.createIssueInBugzilla({
-          issue: {
-            transaction_id: issue?.context?.transaction_id,
-            summary: issue?.message?.issue?.description.long_desc,
-            bpp_id: issue?.context?.bap_id,
-            bpp_name: issue?.context?.bap_uri,
-            attachments: issue?.message?.issue?.description?.images,
-            alias: issue?.context?.transaction_id,
-            product:
-              issue?.message?.issue?.order_details?.items[0]?.product_name,
-            action: issue?.message?.issue?.issue_actions,
+        bugzillaService.updateIssueInBugzilla({
+          resolved: false,
+          transaction_id: issue?.context?.transaction_id,
+          issue_actions: {
+            ...issue.message.issue.issue_actions,
+            ...issuePayload.message.issue.issue_actions,
           },
-          issue_Actions: issue.message.issue.issue_actions,
         });
-
-        console.log(
-          "🚀 ~ file: issues.service.ts:331 ~ IssueService ~ createIssue ~ bugzillaResponse:",
-          bugzillaResponse
-        );
       }
+
       // keep updating issue with new complainent actions
       await dbServices.addOrUpdateIssueWithKeyValue({
         issueKeyToFind: "context.transaction_id",
@@ -462,7 +411,10 @@ class IssueService {
         key: "context.transaction_id",
         value: req.body.transaction_id,
       });
-
+      console.log(
+        "🚀 ~ file: issues.service.ts:808 ~ issue_response ~ fetchedIssueFromDataBase:",
+        fetchedIssueFromDataBase
+      );
       if (fetchedIssueFromDataBase.status === 404) {
         return res
           .status(200)
@@ -491,6 +443,9 @@ class IssueService {
         action_triggered: req.body.action_triggered,
         cascaded_level: 1,
       };
+      console.log(
+        "🚀 ~ file: issues.service.ts:509 ~ issue_response ~ payload:"
+      );
 
       // responding with Different status by Provider
 
@@ -503,6 +458,7 @@ class IssueService {
             action: "on_issue_status",
             core_version: "1.0.0",
             timestamp: new Date(),
+            message_id: uuid(),
           },
           message: {
             issue: {
@@ -540,6 +496,7 @@ class IssueService {
             action: "on_issue_status",
             core_version: "1.0.0",
             timestamp: new Date(),
+            message_id: uuid(),
           },
           message: {
             issue: {
@@ -615,6 +572,7 @@ class IssueService {
             action: "on_issue_status",
             core_version: "1.0.0",
             timestamp: new Date(),
+            message_id: uuid(),
           },
           message: {
             issue: {
@@ -689,6 +647,11 @@ class IssueService {
         message_id: payloadForResolvedissue.context.message_id,
       });
 
+      console.log(
+        "🚀 ~ file: issues.service.ts:706 ~ issue_response ~ response:",
+        response
+      );
+
       if (response?.data.message?.ack?.status === "ACK") {
         await dbServices.addOrUpdateIssueWithKeyValue({
           issueKeyToFind: "context.transaction_id",
@@ -744,16 +707,26 @@ class IssueService {
           },
         });
 
-        await bugzillaService.updateIssueInBugzilla({
+        console.log(
+          "fetchedIssueFromDataBase.message.issue.issue_actions",
+          fetchedIssueFromDataBase.message.issue.issue_actions
+        );
+
+        const updationResponse = await bugzillaService.updateIssueInBugzilla({
           issue_actions: {
             ...fetchedIssueFromDataBase.message.issue.issue_actions,
             respondent_actions:
               payloadForResolvedissue.message.issue.issue_actions
                 .respondent_actions,
           },
-          resolved: true,
+          resolved: false,
           transaction_id: fetchedIssueFromDataBase.context.transaction_id,
         });
+
+        console.log(
+          "🚀 ~ file: issues.service.ts:772 ~ issue_response ~ updationResponse:",
+          updationResponse
+        );
 
         return res.status(200).send({
           context: null,

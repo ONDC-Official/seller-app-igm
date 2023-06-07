@@ -1,5 +1,3 @@
-import { IssueActions } from "./BaseInterface";
-
 export interface BugzillaIssueProps {
   product: string;
   summary: string;
@@ -8,5 +6,4 @@ export interface BugzillaIssueProps {
   bpp_id: string;
   bpp_name: string;
   attachments: string[] | [];
-  action: IssueActions;
 }

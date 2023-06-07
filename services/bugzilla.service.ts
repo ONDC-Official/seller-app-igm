@@ -3,6 +3,7 @@ import { logger } from "../shared/logger";
 import HttpRequest from "../utils/request";
 import { IssueActions } from "../interfaces/BaseInterface";
 import { BugzillaIssueProps } from "../interfaces/bugzilla_interfaces";
+
 class BugzillaService {
   constructor() {
     this.createIssueInBugzilla = this.createIssueInBugzilla.bind(this);
@@ -32,16 +33,11 @@ class BugzillaService {
       );
 
       const apiCall = new HttpRequest(
-        "http://192.168.11.146:8005",
+        process.env.BUGZILLA_SERVICE_URI,
         "/create",
         "POST",
         {
           ...payload,
-        },
-        {
-          headers: {
-            "X-BUGZILLA-API-KEY": "zFr25rrxpUFRNwqJRAphlKcytiFUq0nujOdV23h1",
-          },
         }
       );
       const result = await apiCall.send();
@@ -69,6 +65,13 @@ class BugzillaService {
     resolved: boolean;
   }) {
     try {
+      console.log(
+        "🚀 ~ file: bugzilla.service.ts:67 ~ BugzillaService ~ resolved:",
+        resolved,
+        issue_actions,
+        transaction_id
+      );
+
       const apiCall = new HttpRequest(
         process.env.BUGZILLA_SERVICE_URI,
         `/updateBug/${transaction_id}`,
