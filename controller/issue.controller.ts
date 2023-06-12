@@ -86,6 +86,29 @@ class IssueController {
       next(err);
     }
   }
+
+  async on_issue_logistics(req: Request, res: Response, next: NextFunction) {
+    try {
+      logger.info(req);
+
+      await issueService.on_issue(req, res);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async on_issue_status_logistics(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      logger.info(req);
+      await issueService.on_issue_status(req, res);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export default IssueController;

@@ -27,10 +27,6 @@ class BugzillaService {
         attachments: issue?.attachments || [],
         action: issue_Actions,
       };
-      console.log(
-        "🚀 ~ file: bugzilla.service.ts:29 ~ BugzillaService ~ payload:",
-        JSON.stringify(payload)
-      );
 
       const apiCall = new HttpRequest(
         process.env.BUGZILLA_SERVICE_URI,
@@ -41,10 +37,7 @@ class BugzillaService {
         }
       );
       const result = await apiCall.send();
-      console.log(
-        "🚀 ~ file: bugzilla.service.ts:44 ~ BugzillaService ~ result:",
-        result
-      );
+
       if (result.status === 201) {
         logger.info("Created issue in Bugzilla");
         return result.data;
@@ -65,13 +58,6 @@ class BugzillaService {
     resolved: boolean;
   }) {
     try {
-      console.log(
-        "🚀 ~ file: bugzilla.service.ts:67 ~ BugzillaService ~ resolved:",
-        resolved,
-        issue_actions,
-        transaction_id
-      );
-
       const apiCall = new HttpRequest(
         process.env.BUGZILLA_SERVICE_URI,
         `/updateBug/${transaction_id}`,

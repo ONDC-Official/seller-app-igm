@@ -31,6 +31,7 @@ const issueSchema = new Schema({
       },
       order_details: {
         id: { type: String },
+        orderDetailsId: { type: String },
         state: { type: String },
         items: Object,
         fulfillments: [
@@ -43,6 +44,7 @@ const issueSchema = new Schema({
         provider_name: { type: String },
         order_created: { type: Date },
         order_modified_on: { type: Date },
+        merchant_order_id: { type: String },
       },
       description: {
         short_desc: { type: String },

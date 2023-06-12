@@ -119,7 +119,7 @@ class GatewayIssueService {
     const dateObj = new Date(dateString);
 
     // Add 5 minutes to the Date object
-    dateObj.setTime(dateObj.getTime() + 2 * 60000); // 5 minutes = 5 * 60 seconds * 1000 milliseconds
+    dateObj.setTime(dateObj.getTime() + 5 * 60000); // 5 minutes = 5 * 60 seconds * 1000 milliseconds
 
     // Convert the new Date object back to the ISO 8601 format
     const newDateString = dateObj.toISOString();
@@ -192,14 +192,6 @@ class GatewayIssueService {
     data: any;
     message_id: string;
   }) {
-    console.log(
-      ` this.hasResolvedAction(
-        data?.message?.issue?.issue_actions?.respondent_actions
-      )`,
-      this.hasResolvedAction(
-        data?.message?.issue?.issue_actions?.respondent_actions
-      )
-    );
     let onIssueStatusPayload: OnIssue | OnIssueStatusResoloved;
 
     if (
@@ -207,10 +199,6 @@ class GatewayIssueService {
         data?.message?.issue?.issue_actions?.respondent_actions
       )
     ) {
-      console.log(
-        "in if condittion--------------------------------------------------"
-      );
-
       onIssueStatusPayload = {
         context: {
           domain: data?.context?.domain,
@@ -241,10 +229,6 @@ class GatewayIssueService {
         },
       };
     } else {
-      console.log(
-        "in else condittion--------------------------------------------------"
-      );
-
       onIssueStatusPayload = {
         context: {
           domain: data?.context?.domain,
@@ -275,10 +259,6 @@ class GatewayIssueService {
     }
 
     try {
-      console.log(
-        "🚀 ~ file: gatewayIssue.service.ts:249 ~ GatewayIssueService ~ onIssueStatusPayload:",
-        JSON.stringify(onIssueStatusPayload)
-      );
       const createBug = new PostHttpRequest({
         url: "/on_issue_status",
         method: "post",

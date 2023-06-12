@@ -1,5 +1,9 @@
 type ChangeFields<T, R> = Omit<T, keyof R> & R;
 
+export type OmitKey<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+
+export type OmittedProviderNameFromItems = OmitKey<Item, "product_name">[];
+
 // use this for /on_issue
 export type OnIssue = ChangeFields<
   IBaseIssue,
@@ -34,7 +38,34 @@ export type OnIssue = ChangeFields<
   }
 >;
 
-// IntialIssue for creating issue initial when we get /issue
+// issue for logistics payload
+export type IssueRequestLogistics = ChangeFields<
+  IBaseIssue,
+  {
+    message: ChangeFields<
+      Message,
+      {
+        issue: ChangeFields<
+          Issue,
+          {
+            complainant_info: ChangeFields<
+              ComplainantInfo,
+              {
+                person: Omit<Person, "email">;
+              }
+            >;
+            order_details: ChangeFields<
+              Omit<OrderDetails, "orderDetailsId" | "provider_name">,
+              {
+                items: Omit<Item, "product_name">[];
+              }
+            >;
+          }
+        >;
+      }
+    >;
+  }
+>;
 
 // on_issue contains complainent actions
 export type IssueRequest = ChangeFields<
@@ -43,12 +74,7 @@ export type IssueRequest = ChangeFields<
     message: ChangeFields<
       Message,
       {
-        issue: ChangeFields<
-          Omit<Issue, "resolution" | "resolution_provider">,
-          {
-            order_details: Omit<OrderDetails, "id">;
-          }
-        >;
+        issue: Omit<Issue, "resolution" | "resolution_provider">;
       }
     >;
   }
@@ -257,11 +283,13 @@ export interface Org {
 }
 export interface OrderDetails {
   id: string;
+  orderDetailsId: String;
   state: string;
   items: Item[];
   fulfillments: Fulfillment[];
   provider_id: string;
   provider_name: string;
+  merchant_order_id: string;
 }
 export interface Fulfillment {
   id: string;

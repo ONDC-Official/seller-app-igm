@@ -1,6 +1,7 @@
 import { Organization } from "../Model/organization";
 import { Issue } from "../Model/issue";
 import { Product } from "../Model/product";
+import { Order } from "../Model/order";
 
 interface IUpdateIssueWithDynamicID {
   issueKeyToFind?: "context.transaction_id";
@@ -94,6 +95,25 @@ class DbServices {
       };
     }
     return products;
+  };
+
+  findOrderWithIdFromIssueRequest = async ({
+    orderIdFromIssue,
+  }: {
+    orderIdFromIssue: string;
+  }) => {
+    const order: any = await Order.findOne({
+      orderId: orderIdFromIssue,
+    });
+
+    if (!order) {
+      return {
+        status: 404,
+        name: "NO_RECORD_FOUND_ERROR",
+        message: "Record not found",
+      };
+    }
+    return order;
   };
 }
 export default DbServices;
