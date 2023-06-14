@@ -19,6 +19,7 @@ import BugzillaService from "./bugzilla.service";
 import { ComplainantAction } from "../interfaces/BaseInterface";
 import LogisticsContext from "../utils/logistics_context";
 import LogisticsService from "./logistics.service";
+import LogisticsSelectedRequest from "../Model/SelectedLogistics";
 
 const dbServices = new DbServices();
 
@@ -39,7 +40,7 @@ class IssueService {
 
   // checking if closed complainant action exist
   hasClosedAction(array: any) {
-    return array.some(
+    return array?.some(
       (item: ComplainantAction) => item.complainant_action === "CLOSED"
     );
   }
@@ -68,6 +69,34 @@ class IssueService {
         const payloadForLogistics = logisticsContext.issuePayload(issue);
 
         await logisticsService.issue_logistics(payloadForLogistics);
+        
+        console.log(
+          "req?.body?.context?.transaction_id",
+          req?.body?.context?.transaction_id
+        );
+
+        console.log(
+          "req?.body.message.issue.order_details.provider_id",
+          req?.body.message.issue.order_details.provider_id
+        );
+
+        console.log(
+          "🚀 ~ file: issues.service.ts:86 ~ IssueService ~ createIssue ~ LogisticsSelectedRequest:",
+          LogisticsSelectedRequest
+        );
+
+        const selectRequest = await LogisticsSelectedRequest.findOne({
+          where: {
+            transactionId: req?.body?.context?.transaction_id,
+            providerId: req?.body.message.issue.order_details.provider_id,
+          },
+          order: [["createdAt", "DESC"]],
+        });
+
+        console.log(
+          "🚀 ~ file: issues.service.ts:708 ~ IssueService ~ on_issue_status ~ selectRequest:",
+          selectRequest
+        );
       }
 
       // create new issue if issues does not exist
@@ -556,9 +585,15 @@ class IssueService {
    */
   async issueStatus(req: Request, res: Response) {
     try {
-      if (!req?.body?.message) return;
+      if (!req?.body?.message) return Error("Issue is not found");
 
-      const issue_id = req.body.message.issue.id;
+      const issue_id = req.body.message.issue_id;
+      const { message_id } = req.body.context;
+
+      console.log(
+        "🚀 ~ file: issues.service.ts:577 ~ IssueService ~ issueStatus ~ message_id:",
+        message_id
+      );
 
       const result = await dbServices.findIssueWithPathAndValue({
         key: "message.issue.id",
@@ -574,7 +609,7 @@ class IssueService {
 
       const response = await gatewayIssueService.on_issue_status({
         data: result,
-        message_id: uuid(),
+        message_id: message_id,
       });
 
       return res.status(200).json({ success: true, data: response });
@@ -598,7 +633,7 @@ class IssueService {
 
       const requested: IBaseIssue = req.body;
 
-      const issue_id = req.body.message.issue.id;
+      const issue_id = req.body.message.issue_id;
 
       const result = await dbServices.findIssueWithPathAndValue({
         key: "message.issue.id",
@@ -695,11 +730,21 @@ class IssueService {
 
   async on_issue_status(req: Request, res: Response) {
     try {
-      if (!req?.body?.message) return;
+      console.log("req?.body", req?.body);
+
+      if (!req?.body?.message?.issue) return Error("Issue is not found");
 
       const requested: IBaseIssue = req.body;
+      console.log(
+        "🚀 ~ file: issues.service.ts:715 ~ IssueService ~ on_issue_status ~ req.body:",
+        req.body
+      );
 
-      const issue_id = req.body.message.issue.id;
+      const issue_id = req.body.message.issue.issue_id;
+      console.log(
+        "🚀 ~ file: issues.service.ts:717 ~ IssueService ~ on_issue_status ~ issue_id:",
+        issue_id
+      );
 
       const result = await dbServices.findIssueWithPathAndValue({
         key: "message.issue.id",
@@ -716,6 +761,7 @@ class IssueService {
       const mergedIssueWithLogistics: IBaseIssue = {
         context: {
           ...result.context,
+          bap_id: process.env.BPP_URI,
           timestamp: req?.body?.context?.timestamp,
         },
         message: {
@@ -786,6 +832,10 @@ class IssueService {
         message: JSON.stringify(e) || "Something went wrong",
       });
     }
+    console.log(
+      "🚀 ~ file: issues.service.ts:814 ~ IssueService ~ on_issue_status ~ req?.body:",
+      req?.body
+    );
   }
 
   /// Utility Function for Issue Service

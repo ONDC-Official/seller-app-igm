@@ -11,7 +11,11 @@ class LogisticsContext {
       );
 
     const payload: IssueRequestLogistics = {
-      context: issue.context,
+      context: {
+        ...issue.context,
+        bap_uri: `${process.env.BPP_URI}`,
+        bap_id: `${process.env.BPP_ID}`,
+      },
       message: {
         issue: {
           ...issue.message.issue,
