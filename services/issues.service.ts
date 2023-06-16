@@ -40,12 +40,12 @@ class IssueService {
   }
 
   // checking if closed complainant action exist
-  hasClosedAction(array: any) {
+  hasClosedAction(array: any[]) {
     return array?.some(
       (item: ComplainantAction) => item.complainant_action === "CLOSED"
     );
   }
-  hasCascadedAction(array: any) {
+  hasCascadedAction(array: any[]) {
     return array?.some(
       (item: RespondentAction) => item?.respondent_action === "CASCADED"
     );
@@ -107,11 +107,6 @@ class IssueService {
           },
           transaction_id,
           issue.message.issue.created_at
-        );
-
-        console.log(
-          "🚀 ~ file: issues.service.ts:111 ~ IssueService ~ createIssue ~ payloadForLogistics:",
-          payloadForLogistics
         );
 
         await logisticsService.issue_logistics(payloadForLogistics);
@@ -416,7 +411,11 @@ class IssueService {
         }
       }
 
-      if (this.hasClosedAction(issuePayload?.message?.issue.issue_actions)) {
+      if (
+        this.hasClosedAction(
+          issuePayload?.message?.issue.issue_actions.complainant_actions
+        )
+      ) {
         bugzillaService.updateIssueInBugzilla({
           resolved: true,
           transaction_id: issue?.context?.transaction_id,
@@ -679,34 +678,17 @@ class IssueService {
    * @param {*} res    HTTP response object
    */
   async issueStatus(req: Request, res: Response) {
-    console.log(
-      "🚀 ~ file: issues.service.ts:676 ~ IssueService ~ issueStatus ~ req:",
-      req.body
-    );
     try {
-      console.log("first");
       if (!req?.body?.message) return Error("Issue is not found");
 
       const issue_id = req.body.message.issue_id;
-      console.log(
-        "🚀 ~ file: issues.service.ts:681 ~ IssueService ~ issueStatus ~ issue_id:",
-        issue_id
-      );
 
       const { message_id } = req.body.context;
-      console.log(
-        "🚀 ~ file: issues.service.ts:683 ~ IssueService ~ issueStatus ~ message_id:",
-        message_id
-      );
 
       const result = await dbServices.findIssueWithPathAndValue({
         key: "message.issue.id",
         value: issue_id,
       });
-      console.log(
-        "🚀 ~ file: issues.service.ts:692 ~ IssueService ~ issueStatus ~ result:",
-        result
-      );
 
       if (result.status === 404) {
         return res.status(404).json({
@@ -722,10 +704,6 @@ class IssueService {
         },
         order: [["createdAt", "DESC"]],
       });
-      console.log(
-        "🚀 ~ file: issues.service.ts:707 ~ IssueService ~ issueStatus ~ selectRequest:",
-        selectRequest
-      );
 
       const { transaction_id, bpp_id, bpp_uri } =
         selectRequest?.getDataValue("selectedLogistics")?.context;
@@ -749,17 +727,12 @@ class IssueService {
           issue_id: issue_id,
         },
       };
-      console.log(
-        "🚀 ~ file: issues.service.ts:730 ~ IssueService ~ issueStatus ~ payloadForLogistic:",
-        payloadForLogistic
-      );
 
       if (
         this.hasCascadedAction(
           result?.message?.issue?.issue_actions?.respondent_actions
         )
       ) {
-        console.log("0000001111");
         await dbServices.addOrUpdateIssueWithKeyValue({
           issueKeyToFind: "message.issue.id",
           issueValueToFind: issue_id,
@@ -769,7 +742,6 @@ class IssueService {
 
         await logisticsService.issue_status_logistics(payloadForLogistic);
       } else {
-        console.log("dw");
         await gatewayIssueService.on_issue_status({
           data: {
             context: {
@@ -885,11 +857,6 @@ class IssueService {
         },
       };
 
-      console.log(
-        "🚀 ~ file: issues.service.ts:844 ~ IssueService ~ on_issue_logistics ~ data:",
-        JSON.stringify(data)
-      );
-
       await dbServices.findAndUpdateWholeDocument({
         transaction_id,
         data,
@@ -929,19 +896,10 @@ class IssueService {
         messageId: logisiticsMessageId,
         transactionId: logisticsTransactionId,
       } = req?.body;
-      console.log(
-        "🚀 ~ file: issues.service.ts:926 ~ IssueService ~ on_issue_status_logistics ~ logisticsTransactionId:",
-        logisticsTransactionId
-      );
 
       const issueRequest: any = await Issue.findOne({
         logisticsTransactionId: logisticsTransactionId,
       });
-
-      console.log(
-        "🚀 ~ file: issues.service.ts:930 ~ IssueService ~ on_issue_status_logistics ~ issueRequest:",
-        issueRequest
-      );
 
       const retailMessageId = issueRequest?.context?.message_id;
 
@@ -1009,48 +967,11 @@ class IssueService {
           },
         },
       };
-      console.log(
-        "🚀 ~ file: issues.service.ts:995 ~ IssueService ~ on_issue_status_logistics ~ issueSchema:",
-        issueSchema
-      );
-
-      // await dbServices.addOrUpdateIssueWithKeyValue({
-      //   issueValueToFind: issueRequest.context.transaction_id,
-      //   issueKeyToFind: "context.transaction_id",
-      //   keyPathForUpdating: "message.issue",
-      //   issueSchema,
-      // });
 
       await dbServices.addOrUpdateIssueWithtransactionId(
         issueRequest.context.transaction_id,
         issueSchema
       );
-
-      // await dbServices.findAndUpdateWholeDocument({
-      //   transaction_id: issueRequest.context.transaction_id,
-      //   data: {
-      //     ...issueRequest,
-      //     context: {
-      //       ...issueRequest.context,
-      //       ttl: issueRequest.context.ttl,
-      //     },
-      //     message: {
-      //       issue: {
-      //         ...issueRequest.message.issue,
-      //         ...logistics_on_issue_status?.[0].message.issue,
-      //         issue_actions: {
-      //           ...issueRequest.message.issue.issue_actions,
-      //           complainant_actions:
-      //             issueRequest.message.issue.issue_actions.complainant_actions,
-      //           respondent_actions: [
-      //             ...logistics_on_issue_status?.[0]?.message?.issue
-      //               ?.issue_actions?.respondent_actions,
-      //           ],
-      //         },
-      //       },
-      //     },
-      //   },
-      // });
 
       return res.status(200).send({
         context: null,

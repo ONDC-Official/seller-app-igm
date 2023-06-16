@@ -194,11 +194,6 @@ class GatewayIssueService {
     message_id: string;
   }) {
     try {
-      console.log(
-        "data",
-        data,
-        data?.message?.issue?.issue_actions?.respondent_actions
-      );
       let onIssueStatusPayload: OnIssue | OnIssueStatusResoloved;
 
       if (
@@ -265,7 +260,6 @@ class GatewayIssueService {
         };
       }
 
-      console.log("onIssueStatusPayload", onIssueStatusPayload);
       const createBug = new PostHttpRequest({
         url: "/on_issue_status",
         method: "post",

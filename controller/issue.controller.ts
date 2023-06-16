@@ -63,7 +63,6 @@ class IssueController {
   async issue_status(req: Request, res: Response, next: NextFunction) {
     try {
       logger.info("issue_status", req);
-      console.log("dwdwdw");
       await issueService.issueStatus(req, res);
     } catch (err) {
       next(err);
@@ -103,7 +102,6 @@ class IssueController {
     next: NextFunction
   ) {
     try {
-      console.log("first-------------------");
       logger.info("on_issue_status_logistics", req?.body);
       await issueService.on_issue_status_logistics(req, res);
     } catch (err) {

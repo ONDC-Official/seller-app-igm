@@ -36,11 +36,6 @@ class LogisticsContext {
       order: [["createdAt", "DESC"]],
     });
 
-    console.log(
-      "🚀 ~ file: logistics_context.ts:34 ~ LogisticsContext ~ issuePayload ~ selectRequest:",
-      JSON.stringify(selectRequest)
-    );
-
     if (
       this.hasResolvedAction(
         issue?.message?.issue?.issue_actions?.respondent_actions
