@@ -6,7 +6,7 @@ export type OmittedProviderNameFromItems = OmitKey<Item, "product_name">[];
 
 // use this for /on_issue
 export type OnIssue = ChangeFields<
-  IBaseIssue,
+  Omit<IBaseIssue, "logisticsTransactionId">,
   {
     context: Omit<Context, "ttl">;
     message: ChangeFields<
@@ -40,7 +40,36 @@ export type OnIssue = ChangeFields<
 
 // issue for logistics payload
 export type IssueRequestLogistics = ChangeFields<
-  IBaseIssue,
+  Omit<IBaseIssue, "logisticsTransactionId">,
+  {
+    message: ChangeFields<
+      Message,
+      {
+        issue: ChangeFields<
+          Omit<Issue, "resolution_provider" | "resolution">,
+          {
+            complainant_info: ChangeFields<
+              ComplainantInfo,
+              {
+                person: Omit<Person, "email">;
+              }
+            >;
+
+            order_details: ChangeFields<
+              Omit<OrderDetails, "orderDetailsId" | "provider_name">,
+              {
+                items: Omit<Item, "product_name">[];
+              }
+            >;
+          }
+        >;
+      }
+    >;
+  }
+>;
+
+export type IssueRequestLogisticsResolved = ChangeFields<
+  Omit<IBaseIssue, "logisticsTransactionId">,
   {
     message: ChangeFields<
       Message,
@@ -83,7 +112,7 @@ export type IssueRequest = ChangeFields<
 // use this for /on_issue_status when Seller has RESOLVED the issue
 
 export type OnIssueStatusResoloved = ChangeFields<
-  IBaseIssue,
+  Omit<IBaseIssue, "logisticsTransactionId">,
   {
     context: Omit<Context, "ttl">;
     message: ChangeFields<
@@ -117,6 +146,7 @@ export type OnIssueStatusResoloved = ChangeFields<
 export interface IBaseIssue {
   context: Context;
   message: Message;
+  logisticsTransactionId?: string;
 }
 export interface Context {
   domain: string;

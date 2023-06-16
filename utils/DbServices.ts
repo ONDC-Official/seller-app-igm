@@ -4,7 +4,7 @@ import { Product } from "../Model/product";
 import { Order } from "../Model/order";
 
 interface IUpdateIssueWithDynamicID {
-  issueKeyToFind?: "context.transaction_id";
+  issueKeyToFind?: "context.transaction_id" | string;
   issueValueToFind: string | any;
   keyPathForUpdating: string | any;
   issueSchema: any;
@@ -63,6 +63,35 @@ class DbServices {
       };
     }
     return issue;
+  };
+
+  findAndUpdateWholeDocument = async ({
+    transaction_id,
+    data,
+  }: {
+    transaction_id: string;
+    data: any;
+  }) => {
+    await Issue.findOneAndUpdate(
+      { "context.transaction_id": transaction_id },
+      data,
+      { new: true }
+    );
+  };
+
+  addOrUpdateIssueWithtransactionId = async (
+    transactionId: string | any,
+    issueSchema: object = {}
+  ) => {
+    return await Issue.findOneAndUpdate(
+      {
+        transaction_id: transactionId,
+      },
+      {
+        ...issueSchema,
+      },
+      { upsert: true }
+    );
   };
 
   findOrganizationWithId = async ({

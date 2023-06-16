@@ -7,6 +7,7 @@ import {
   RespondentAction,
 } from "../interfaces/BaseInterface";
 import { v4 as uuidv4 } from "uuid";
+import { logger } from "../shared/logger";
 
 const dbServices = new DbServices();
 class GatewayIssueService {
@@ -31,7 +32,7 @@ class GatewayIssueService {
         domain: payload.context.domain,
         country: payload.context.country,
         city: payload.context.city,
-        action: "on_issue",
+        action: "on_issue_status",
         core_version: "1.0.0",
         bap_id: payload.context.bap_id,
         bap_uri: payload.context.bap_uri,
@@ -55,7 +56,7 @@ class GatewayIssueService {
                     name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
                   },
                   contact: {
-                    phone: "6239083807",
+                    phone: "9876543210",
                     email: "Rishabhnand.singh@ondc.org",
                   },
                   person: {
@@ -176,7 +177,7 @@ class GatewayIssueService {
   }
 
   hasResolvedAction(actions: RespondentAction[]) {
-    return actions.some(
+    return actions?.some(
       (item: RespondentAction) => item.respondent_action === "RESOLVED"
     );
   }
@@ -187,78 +188,84 @@ class GatewayIssueService {
    */
   async on_issue_status({
     data,
-    message_id,
+    message_id = uuidv4(),
   }: {
     data: any;
     message_id: string;
   }) {
-    let onIssueStatusPayload: OnIssue | OnIssueStatusResoloved;
-
-    if (
-      this.hasResolvedAction(
-        data?.message?.issue?.issue_actions?.respondent_actions
-      )
-    ) {
-      onIssueStatusPayload = {
-        context: {
-          domain: data?.context?.domain,
-          country: data?.context?.country,
-          city: data?.context?.city,
-          action: "on_issue_status",
-          core_version: "1.0.0",
-          bap_id: data?.context?.bap_id,
-          bap_uri: data?.context?.bap_uri,
-          bpp_id: data?.context?.bpp_id,
-          bpp_uri: data?.context?.bpp_uri,
-          transaction_id: data?.context?.transaction_id,
-          message_id: message_id,
-          timestamp: new Date(),
-        },
-        message: {
-          issue: {
-            id: data?.message?.issue?.id,
-            issue_actions: {
-              respondent_actions:
-                data?.message?.issue?.issue_actions?.respondent_actions,
-            },
-            resolution: data?.message?.issue?.resolution,
-            resolution_provider: data?.message?.issue?.resolution_provider,
-            created_at: data?.message?.issue?.created_at,
-            updated_at: data?.message?.issue?.updated_at,
-          },
-        },
-      };
-    } else {
-      onIssueStatusPayload = {
-        context: {
-          domain: data?.context?.domain,
-          country: data?.context?.country,
-          city: data?.context?.city,
-          action: "on_issue_status",
-          core_version: "1.0.0",
-          bap_id: data?.context?.bap_id,
-          bap_uri: data?.context?.bap_uri,
-          bpp_id: data?.context?.bpp_id,
-          bpp_uri: data?.context?.bpp_uri,
-          transaction_id: data?.context?.transaction_id,
-          message_id: message_id,
-          timestamp: new Date(),
-        },
-        message: {
-          issue: {
-            id: data?.message?.issue?.id,
-            issue_actions: {
-              respondent_actions:
-                data?.message?.issue?.issue_actions?.respondent_actions,
-            },
-            created_at: data?.message?.issue?.created_at,
-            updated_at: data?.message?.issue?.updated_at,
-          },
-        },
-      };
-    }
-
     try {
+      console.log(
+        "data",
+        data,
+        data?.message?.issue?.issue_actions?.respondent_actions
+      );
+      let onIssueStatusPayload: OnIssue | OnIssueStatusResoloved;
+
+      if (
+        this.hasResolvedAction(
+          data?.message?.issue?.issue_actions?.respondent_actions
+        )
+      ) {
+        onIssueStatusPayload = {
+          context: {
+            domain: data?.context?.domain,
+            country: data?.context?.country,
+            city: data?.context?.city,
+            action: "on_issue_status",
+            core_version: "1.0.0",
+            bap_id: data?.context?.bap_id,
+            bap_uri: data?.context?.bap_uri,
+            bpp_id: data?.context?.bpp_id,
+            bpp_uri: data?.context?.bpp_uri,
+            transaction_id: data?.context?.transaction_id,
+            message_id: message_id,
+            timestamp: new Date(),
+          },
+          message: {
+            issue: {
+              id: data?.message?.issue?.id,
+              issue_actions: {
+                respondent_actions:
+                  data?.message?.issue?.issue_actions?.respondent_actions,
+              },
+              resolution: data?.message?.issue?.resolution,
+              resolution_provider: data?.message?.issue?.resolution_provider,
+              created_at: data?.message?.issue?.created_at,
+              updated_at: data?.message?.issue?.updated_at,
+            },
+          },
+        };
+      } else {
+        onIssueStatusPayload = {
+          context: {
+            domain: data?.context?.domain,
+            country: data?.context?.country,
+            city: data?.context?.city,
+            action: "on_issue_status",
+            core_version: "1.0.0",
+            bap_id: data?.context?.bap_id,
+            bap_uri: data?.context?.bap_uri,
+            bpp_id: data?.context?.bpp_id,
+            bpp_uri: data?.context?.bpp_uri,
+            transaction_id: data?.context?.transaction_id,
+            message_id: message_id,
+            timestamp: new Date(),
+          },
+          message: {
+            issue: {
+              id: data?.message?.issue?.id,
+              issue_actions: {
+                respondent_actions:
+                  data?.message?.issue?.issue_actions?.respondent_actions,
+              },
+              created_at: data?.message?.issue?.created_at,
+              updated_at: data?.message?.issue?.updated_at,
+            },
+          },
+        };
+      }
+
+      console.log("onIssueStatusPayload", onIssueStatusPayload);
       const createBug = new PostHttpRequest({
         url: "/on_issue_status",
         method: "post",
@@ -269,6 +276,7 @@ class GatewayIssueService {
 
       return response;
     } catch (error) {
+      logger.error(error);
       return error;
     }
   }

@@ -22,8 +22,4 @@ router.post(
 );
 router.post("/issue_status", issueController.issue_status);
 
-
-router.post("/on_issue", issueController.on_issue_logistics);
-router.post("/on_issue_status", issueController.on_issue_status_logistics);
-
 export default router;

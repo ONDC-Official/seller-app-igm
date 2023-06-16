@@ -13,7 +13,7 @@ class IssueController {
    */
   async createIssue(req: Request, res: Response, next: NextFunction) {
     try {
-      logger.info(req);
+      logger.info("createIssue", req?.body);
       await issueService.createIssue(req, res);
     } catch (err) {
       next(err);
@@ -29,7 +29,7 @@ class IssueController {
 
   async getAllIssues(req: Request, res: Response, next: NextFunction) {
     try {
-      logger.info(req);
+      logger.info("getAllIssues", req?.body);
       await issueService.getAllIssues(req, res);
     } catch (err) {
       next(err);
@@ -45,7 +45,7 @@ class IssueController {
 
   async issue_response(req: Request, res: Response, next: NextFunction) {
     try {
-      logger.info(req);
+      logger.info("issue_response", req?.body);
 
       await issueService.issue_response(req, res);
     } catch (err) {
@@ -62,8 +62,8 @@ class IssueController {
 
   async issue_status(req: Request, res: Response, next: NextFunction) {
     try {
-      logger.info(req);
-
+      logger.info("issue_status", req);
+      console.log("dwdwdw");
       await issueService.issueStatus(req, res);
     } catch (err) {
       next(err);
@@ -79,7 +79,7 @@ class IssueController {
 
   async getSingleIssue(req: Request, res: Response, next: NextFunction) {
     try {
-      logger.info(req);
+      logger.info("getSingleIssue", req?.body);
 
       await issueService.getSingleIssue(req, res);
     } catch (err) {
@@ -89,9 +89,9 @@ class IssueController {
 
   async on_issue_logistics(req: Request, res: Response, next: NextFunction) {
     try {
-      logger.info(req);
+      logger.info("on_issue_logistics", req?.body);
 
-      await issueService.on_issue(req, res);
+      await issueService.on_issue_logistics(req, res);
     } catch (err) {
       next(err);
     }
@@ -103,8 +103,9 @@ class IssueController {
     next: NextFunction
   ) {
     try {
-      logger.info(req);
-      await issueService.on_issue_status(req, res);
+      console.log("first-------------------");
+      logger.info("on_issue_status_logistics", req?.body);
+      await issueService.on_issue_status_logistics(req, res);
     } catch (err) {
       next(err);
     }

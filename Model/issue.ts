@@ -138,5 +138,8 @@ const issueSchema = new Schema({
       updated_at: { type: Date },
     },
   },
+  logisticsTransactionId: {
+    type: String,
+  },
 });
 export const Issue = mongoose.model("Issue", issueSchema);

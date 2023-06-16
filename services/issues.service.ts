@@ -19,6 +19,8 @@ import BugzillaService from "./bugzilla.service";
 import { ComplainantAction } from "../interfaces/BaseInterface";
 import LogisticsContext from "../utils/logistics_context";
 import LogisticsService from "./logistics.service";
+import LogisticsSelectedRequest from "../Model/SelectedLogistics";
+import { RespondentAction } from "../interfaces/BaseInterface";
 
 const dbServices = new DbServices();
 
@@ -39,9 +41,18 @@ class IssueService {
 
   // checking if closed complainant action exist
   hasClosedAction(array: any) {
-    return array.some(
+    return array?.some(
       (item: ComplainantAction) => item.complainant_action === "CLOSED"
     );
+  }
+  hasCascadedAction(array: any) {
+    return array?.some(
+      (item: RespondentAction) => item?.respondent_action === "CASCADED"
+    );
+  }
+
+  hasKey(obj: object, key: string): boolean {
+    return key in obj;
   }
 
   /**
@@ -62,10 +73,46 @@ class IssueService {
       });
 
       if (
-        item_subcategories.includes(issuePayload.message.issue.sub_category) &&
-        !issue.status
+        item_subcategories.includes(issue?.message?.issue?.sub_category) &&
+        !this.hasKey(issue, "status")
       ) {
-        const payloadForLogistics = logisticsContext.issuePayload(issue);
+        const selectRequest = await LogisticsSelectedRequest.findOne({
+          where: {
+            transactionId: issue.context?.transaction_id,
+            providerId: issue.message.issue.order_details?.provider_id,
+          },
+          order: [["createdAt", "DESC"]],
+        });
+
+        const transaction_id =
+          selectRequest?.getDataValue("selectedLogistics")?.context
+            .transaction_id;
+
+        const payloadForLogistics = await logisticsContext.issuePayload(
+          {
+            context: issue.context,
+            message: {
+              issue: {
+                ...issue.message.issue,
+                ...issuePayload.message.issue,
+                issue_actions: {
+                  ...issue.message.issue.issue_actions,
+                  complainant_actions: [
+                    issuePayload?.message?.issue.issue_actions
+                      ?.complainant_actions,
+                  ],
+                },
+              },
+            },
+          },
+          transaction_id,
+          issue.message.issue.created_at
+        );
+
+        console.log(
+          "🚀 ~ file: issues.service.ts:111 ~ IssueService ~ createIssue ~ payloadForLogistics:",
+          payloadForLogistics
+        );
 
         await logisticsService.issue_logistics(payloadForLogistics);
       }
@@ -109,12 +156,110 @@ class IssueService {
           orderIdFromIssue: issuePayload?.message?.issue?.order_details?.id,
         });
 
+        //schedule a job for sending respondant action processing after 5 min if Provider has not initiated
+
+        Scheduler.scheduleJob(
+          gatewayIssueService.startProcessingIssueAfter5Minutes(
+            issuePayload.message.issue.created_at
+          ),
+
+          async () => {
+            gatewayIssueService.scheduleAJob({
+              payload: issuePayload,
+              transaction_id: issuePayload.context.transaction_id,
+            });
+          }
+        );
+
+        // checking and sending to logisitics if issue is related to
+        const selectRequest = await LogisticsSelectedRequest.findOne({
+          where: {
+            transactionId: req?.body?.context?.transaction_id,
+            providerId: req?.body.message.issue.order_details.provider_id,
+          },
+          order: [["createdAt", "DESC"]],
+        });
+
+        const transaction_id =
+          selectRequest?.getDataValue("selectedLogistics")?.context
+            ?.transaction_id;
+        if (
+          item_subcategories.includes(issuePayload.message.issue.sub_category)
+        ) {
+          const issuePayloadLogisticsAndOn_issue = {
+            ...issuePayload,
+            message: {
+              issue: {
+                ...issuePayload?.message?.issue,
+                issue_actions: {
+                  ...issuePayload?.message?.issue?.issue_actions,
+                  respondent_actions: [
+                    {
+                      respondent_action: "PROCESSING",
+                      short_desc: "We are investigating your concern.",
+                      updated_at: new Date(),
+                      updated_by: {
+                        org: {
+                          name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                        },
+                        contact: {
+                          phone: "9876543210",
+                          email: "Rishabhnand.singh@ondc.org",
+                        },
+                        person: {
+                          name: "Rishabhnand Singh",
+                        },
+                      },
+                      cascaded_level: 1,
+                    },
+                    {
+                      respondent_action: "CASCADED",
+                      short_desc: "We have sent your request to logistics.",
+                      updated_at: new Date(),
+                      updated_by: {
+                        org: {
+                          name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                        },
+                        contact: {
+                          phone: "9876543210",
+                          email: "Rishabhnand.singh@ondc.org",
+                        },
+                        person: {
+                          name: "Rishabhnand Singh",
+                        },
+                      },
+                      cascaded_level: 2,
+                    },
+                  ],
+                },
+              },
+            },
+          };
+
+          const payloadForLogistics = await logisticsContext.issuePayload(
+            issuePayloadLogisticsAndOn_issue,
+            transaction_id,
+            new Date().toISOString()
+          );
+
+          const response: any = await gatewayIssueService.on_issue(
+            issuePayloadLogisticsAndOn_issue
+          );
+
+          if (response?.data.message?.ack?.status === "ACK") {
+            await logisticsService.issue_logistics(payloadForLogistics);
+
+            await Scheduler.gracefulShutdown();
+          }
+        }
+
         const createIssuePayload: IssueRequest = {
           context: {
             ...issuePayload.context,
             timestamp: new Date(),
-            action: "on_issue",
+            action: "on_issue_status",
             core_version: "1.0.0",
+            ttl: issuePayload.context.ttl,
           },
           message: {
             issue: {
@@ -134,20 +279,11 @@ class IssueService {
               },
             },
           },
+          logisticsTransactionId: transaction_id,
         };
 
         //creating issue
         await Issue.create(createIssuePayload);
-
-        // checking and sending to logisitics if issue is related to
-        if (
-          item_subcategories.includes(issuePayload.message.issue.sub_category)
-        ) {
-          const payloadForLogistics =
-            logisticsContext.issuePayload(createIssuePayload);
-
-          await logisticsService.issue_logistics(payloadForLogistics);
-        }
 
         try {
           const updatedIssueForBugzilla: IBaseIssue =
@@ -175,21 +311,6 @@ class IssueService {
             issue_Actions:
               updatedIssueForBugzilla?.message?.issue?.issue_actions,
           });
-
-          //schedule a job for sending respondant action processing after 5 min if Provider has not initiated
-
-          Scheduler.scheduleJob(
-            gatewayIssueService.startProcessingIssueAfter5Minutes(
-              issuePayload.message.issue.created_at
-            ),
-
-            async () => {
-              gatewayIssueService.scheduleAJob({
-                payload: issuePayload,
-                transaction_id: issuePayload.context.transaction_id,
-              });
-            }
-          );
 
           return res.status(201).send({
             status: 201,
@@ -393,7 +514,10 @@ class IssueService {
 
       // return all issues is Super Admin
       if (req.body?.user?.user?.role?.name === "Super Admin") {
-        const allIssues = await Issue.find()
+        const allIssues = await Issue.find({
+          "message.issue.order_details.provider_id":
+            req.body?.user?.user?.organization,
+        })
           .sort({ "message.issue.created_at": -1 })
           .skip(query.offset * query.limit)
           .limit(query.limit)
@@ -555,15 +679,34 @@ class IssueService {
    * @param {*} res    HTTP response object
    */
   async issueStatus(req: Request, res: Response) {
+    console.log(
+      "🚀 ~ file: issues.service.ts:676 ~ IssueService ~ issueStatus ~ req:",
+      req.body
+    );
     try {
-      if (!req?.body?.message) return;
+      console.log("first");
+      if (!req?.body?.message) return Error("Issue is not found");
 
-      const issue_id = req.body.message.issue.id;
+      const issue_id = req.body.message.issue_id;
+      console.log(
+        "🚀 ~ file: issues.service.ts:681 ~ IssueService ~ issueStatus ~ issue_id:",
+        issue_id
+      );
+
+      const { message_id } = req.body.context;
+      console.log(
+        "🚀 ~ file: issues.service.ts:683 ~ IssueService ~ issueStatus ~ message_id:",
+        message_id
+      );
 
       const result = await dbServices.findIssueWithPathAndValue({
         key: "message.issue.id",
         value: issue_id,
       });
+      console.log(
+        "🚀 ~ file: issues.service.ts:692 ~ IssueService ~ issueStatus ~ result:",
+        result
+      );
 
       if (result.status === 404) {
         return res.status(404).json({
@@ -572,12 +715,92 @@ class IssueService {
         });
       }
 
-      const response = await gatewayIssueService.on_issue_status({
-        data: result,
-        message_id: uuid(),
+      const selectRequest = await LogisticsSelectedRequest.findOne({
+        where: {
+          transactionId: result?.context?.transaction_id,
+          providerId: result?.message?.issue?.order_details.provider_id,
+        },
+        order: [["createdAt", "DESC"]],
       });
+      console.log(
+        "🚀 ~ file: issues.service.ts:707 ~ IssueService ~ issueStatus ~ selectRequest:",
+        selectRequest
+      );
 
-      return res.status(200).json({ success: true, data: response });
+      const { transaction_id, bpp_id, bpp_uri } =
+        selectRequest?.getDataValue("selectedLogistics")?.context;
+
+      const payloadForLogistic = {
+        context: {
+          domain: "nic2004:60232",
+          city: "std:080",
+          country: "IND",
+          action: "issue_status",
+          core_version: "1.0.0",
+          bap_uri: `${process.env.BPP_URI}`,
+          bap_id: `${process.env.BPP_ID}`,
+          bpp_id: bpp_id,
+          bpp_uri: bpp_uri,
+          transaction_id: transaction_id,
+          message_id: message_id,
+          timestamp: new Date(),
+        },
+        message: {
+          issue_id: issue_id,
+        },
+      };
+      console.log(
+        "🚀 ~ file: issues.service.ts:730 ~ IssueService ~ issueStatus ~ payloadForLogistic:",
+        payloadForLogistic
+      );
+
+      if (
+        this.hasCascadedAction(
+          result?.message?.issue?.issue_actions?.respondent_actions
+        )
+      ) {
+        console.log("0000001111");
+        await dbServices.addOrUpdateIssueWithKeyValue({
+          issueKeyToFind: "message.issue.id",
+          issueValueToFind: issue_id,
+          keyPathForUpdating: "context.message_id",
+          issueSchema: message_id,
+        });
+
+        await logisticsService.issue_status_logistics(payloadForLogistic);
+      } else {
+        console.log("dw");
+        await gatewayIssueService.on_issue_status({
+          data: {
+            context: {
+              ...result?.context,
+              message_id: req.body.context.message_id,
+            },
+            message: {
+              issue: {
+                ...result?.message?.issue,
+                issue_actions: {
+                  ...result?.message?.issue?.issue_actions,
+                  respondent_actions: [
+                    ...result?.message?.issue.issue_actions.respondent_actions,
+                  ],
+                },
+                updated_at: result?.message?.issue.updated_at,
+              },
+            },
+          },
+          message_id: message_id,
+        });
+      }
+
+      return res.status(200).send({
+        context: null,
+        message: {
+          ack: {
+            status: "ACK",
+          },
+        },
+      });
     } catch (e) {
       return res.status(500).json({
         error: true,
@@ -592,78 +815,84 @@ class IssueService {
    * @param {*} res    HTTP response object
    */
 
-  async on_issue(req: Request, res: Response) {
+  async on_issue_logistics(req: Request, res: Response) {
     try {
-      if (!req?.body?.message) return;
+      const {
+        messageId: logisticsMessageId,
+        transactionId: logisticsTransactionId,
+      } = req?.body;
 
-      const requested: IBaseIssue = req.body;
-
-      const issue_id = req.body.message.issue.id;
-
-      const result = await dbServices.findIssueWithPathAndValue({
-        key: "message.issue.id",
-        value: issue_id,
+      const issueRequest: any = await Issue.findOne({
+        logisticsTransactionId: logisticsTransactionId,
       });
 
-      if (result?.status === 404) {
-        return res.status(404).json({
-          error: true,
-          message: result.message || "Something went wrong",
-        });
-      }
+      const retailMessageId = issueRequest?.context?.message_id;
 
-      const mergedIssueWithLogistics: IBaseIssue = {
+      const logisticsResponse: any = await logisticsService?.getLogistics(
+        logisticsMessageId,
+        retailMessageId,
+        "issue"
+      );
+
+      const retail_issue = logisticsResponse?.retail_issue;
+      const logistics_on_issue = logisticsResponse?.logistics_on_issue;
+
+      const mergedIssueWithLogistics: OnIssue = {
         context: {
-          ...result.context,
+          message_id: uuid(),
           timestamp: req?.body?.context?.timestamp,
+          domain: "nic2004:52110",
+          country: retail_issue?.[0]?.context?.country,
+          city: retail_issue?.[0]?.context?.city,
+          action: "on_issue_status",
+          core_version: retail_issue?.[0].context.core_version,
+          bap_uri: retail_issue?.[0].context.bap_uri,
+          bap_id: retail_issue?.[0]?.context?.bap_id,
+          bpp_id: `${process.env.BPP_ID}`,
+          bpp_uri: `${process.env.BPP_URI}`,
+          transaction_id: retail_issue?.[0]?.context?.transaction_id,
         },
         message: {
           issue: {
-            ...result.message.issue,
-            ...req.body.message.issue,
-            updated_at: req.body.message.issue.updated_at,
+            ...retail_issue?.[0].message.issue,
             issue_actions: {
-              ...result.message.issue.issue_actions,
-              respondent_actions: {
-                ...result?.message?.issue?.issue_actions?.respondent_actions,
-                ...requested.message?.issue?.issue_actions?.respondent_actions,
-              },
-            },
-            resolution_provider: {
-              respondent_info: {
-                ...requested.message?.issue?.resolution_provider
-                  ?.respondent_info,
-                resolution_support: {
-                  ...requested.message?.issue?.resolution_provider
-                    .respondent_info?.resolution_support,
-                  gros: [
-                    ...requested.message?.issue?.resolution_provider
-                      .respondent_info?.resolution_support?.gros,
-                    {
-                      person: {
-                        name: "Sam D",
-                      },
-                      contact: {
-                        phone: "9605960796",
-                        email: "email@gro.com",
-                      },
-                      gro_type: "TRANSACTION-COUNTERPARTY-NP-GRO",
-                    },
-                  ],
-                },
-              },
+              respondent_actions: [
+                ...logistics_on_issue?.[0]?.message?.issue?.issue_actions
+                  ?.respondent_actions,
+              ],
             },
           },
         },
       };
 
-      const transaction_id = req?.body?.context?.transaction_id;
+      const transaction_id = retail_issue?.[0]?.context?.transaction_id;
 
-      await dbServices.addOrUpdateIssueWithKeyValue({
-        issueKeyToFind: "context.transaction_id",
-        issueValueToFind: transaction_id,
-        keyPathForUpdating: "",
-        issueSchema: mergedIssueWithLogistics,
+      const data = {
+        // ...issueRequest,
+        context: {
+          ...mergedIssueWithLogistics.context,
+          ttl: issueRequest.context.ttl,
+        },
+        message: {
+          issue: {
+            ...mergedIssueWithLogistics.message.issue,
+            issue_actions: {
+              ...mergedIssueWithLogistics.message.issue.issue_actions,
+              complainant_actions:
+                issueRequest.message.issue.issue_actions.complainant_actions,
+            },
+          },
+        },
+      };
+
+      console.log(
+        "🚀 ~ file: issues.service.ts:844 ~ IssueService ~ on_issue_logistics ~ data:",
+        JSON.stringify(data)
+      );
+
+      await dbServices.findAndUpdateWholeDocument({
+        transaction_id,
+        data,
       });
 
       await gatewayIssueService.on_issue_status({
@@ -693,84 +922,135 @@ class IssueService {
    * @param {*} res    HTTP response object
    */
 
-  async on_issue_status(req: Request, res: Response) {
+  async on_issue_status_logistics(req: Request, res: Response) {
     try {
-      if (!req?.body?.message) return;
+      let mergedIssueWithLogisticsRespondentAction: any;
+      const {
+        messageId: logisiticsMessageId,
+        transactionId: logisticsTransactionId,
+      } = req?.body;
+      console.log(
+        "🚀 ~ file: issues.service.ts:926 ~ IssueService ~ on_issue_status_logistics ~ logisticsTransactionId:",
+        logisticsTransactionId
+      );
 
-      const requested: IBaseIssue = req.body;
-
-      const issue_id = req.body.message.issue.id;
-
-      const result = await dbServices.findIssueWithPathAndValue({
-        key: "message.issue.id",
-        value: issue_id,
+      const issueRequest: any = await Issue.findOne({
+        logisticsTransactionId: logisticsTransactionId,
       });
 
-      if (result?.status === 404) {
-        return res.status(404).json({
-          error: true,
-          message: result.message || "Something went wrong",
-        });
-      }
+      console.log(
+        "🚀 ~ file: issues.service.ts:930 ~ IssueService ~ on_issue_status_logistics ~ issueRequest:",
+        issueRequest
+      );
 
-      const mergedIssueWithLogistics: IBaseIssue = {
+      const retailMessageId = issueRequest?.context?.message_id;
+
+      const logisticsResponse: any = await logisticsService?.getLogistics(
+        logisiticsMessageId,
+        retailMessageId,
+        "issue_status"
+      );
+
+      const retail_issue_status = logisticsResponse?.retail_issue_status;
+
+      const logistics_on_issue_status =
+        logisticsResponse?.logistics_on_issue_status;
+
+      mergedIssueWithLogisticsRespondentAction = {
         context: {
-          ...result.context,
+          message_id: retailMessageId,
           timestamp: req?.body?.context?.timestamp,
+          domain: "nic2004:52110",
+          country: retail_issue_status?.[0]?.context?.country,
+          city: retail_issue_status?.[0]?.context?.city,
+          action: "on_issue_status",
+          core_version: retail_issue_status?.[0].context.core_version,
+          bap_uri: retail_issue_status?.[0].context.bap_uri,
+          bap_id: retail_issue_status?.[0]?.context?.bap_id,
+          bpp_id: `${process.env.BPP_ID}`,
+          bpp_uri: `${process.env.BPP_URI}`,
+          transaction_id: retail_issue_status?.[0]?.context?.transaction_id,
         },
         message: {
           issue: {
-            ...result.message.issue,
-            ...req.body.message.issue,
-            updated_at: req.body.message.issue.updated_at,
+            ...retail_issue_status?.[0].message.issue,
+            ...logistics_on_issue_status?.[0].message.issue,
             issue_actions: {
-              ...result.message.issue.issue_actions,
-              respondent_actions: {
-                ...result?.message?.issue?.issue_actions?.respondent_actions,
-                ...requested.message?.issue?.issue_actions?.respondent_actions,
-              },
-            },
-            resolution_provider: {
-              respondent_info: {
-                ...requested.message?.issue?.resolution_provider
-                  ?.respondent_info,
-                resolution_support: {
-                  ...requested.message?.issue?.resolution_provider
-                    .respondent_info?.resolution_support,
-                  gros: [
-                    ...requested.message?.issue?.resolution_provider
-                      .respondent_info?.resolution_support?.gros,
-                    {
-                      person: {
-                        name: "Sam D",
-                      },
-                      contact: {
-                        phone: "9605960796",
-                        email: "email@gro.com",
-                      },
-                      gro_type: "TRANSACTION-COUNTERPARTY-NP-GRO",
-                    },
-                  ],
-                },
-              },
+              respondent_actions: [
+                ...logistics_on_issue_status?.[0]?.message?.issue?.issue_actions
+                  ?.respondent_actions,
+              ],
             },
           },
         },
       };
 
-      const transaction_id = req?.body?.context?.transaction_id;
-
-      await dbServices.addOrUpdateIssueWithKeyValue({
-        issueKeyToFind: "context.transaction_id",
-        issueValueToFind: transaction_id,
-        keyPathForUpdating: "",
-        issueSchema: mergedIssueWithLogistics,
-      });
-
       await gatewayIssueService.on_issue_status({
-        data: mergedIssueWithLogistics,
-        message_id: uuid(),
+        data: mergedIssueWithLogisticsRespondentAction,
+        message_id: retailMessageId,
       });
+
+      const issueSchema = {
+        ...issueRequest,
+        context: issueRequest.context,
+        message: {
+          issue: {
+            ...issueRequest.message.issue,
+            ...logistics_on_issue_status?.[0].message.issue,
+            issue_actions: {
+              ...issueRequest.message.issue.issue_actions,
+              complainant_actions:
+                issueRequest.message.issue.issue_actions.complainant_actions,
+              respondent_actions: [
+                ...logistics_on_issue_status?.[0]?.message?.issue?.issue_actions
+                  ?.respondent_actions,
+              ],
+            },
+          },
+        },
+      };
+      console.log(
+        "🚀 ~ file: issues.service.ts:995 ~ IssueService ~ on_issue_status_logistics ~ issueSchema:",
+        issueSchema
+      );
+
+      // await dbServices.addOrUpdateIssueWithKeyValue({
+      //   issueValueToFind: issueRequest.context.transaction_id,
+      //   issueKeyToFind: "context.transaction_id",
+      //   keyPathForUpdating: "message.issue",
+      //   issueSchema,
+      // });
+
+      await dbServices.addOrUpdateIssueWithtransactionId(
+        issueRequest.context.transaction_id,
+        issueSchema
+      );
+
+      // await dbServices.findAndUpdateWholeDocument({
+      //   transaction_id: issueRequest.context.transaction_id,
+      //   data: {
+      //     ...issueRequest,
+      //     context: {
+      //       ...issueRequest.context,
+      //       ttl: issueRequest.context.ttl,
+      //     },
+      //     message: {
+      //       issue: {
+      //         ...issueRequest.message.issue,
+      //         ...logistics_on_issue_status?.[0].message.issue,
+      //         issue_actions: {
+      //           ...issueRequest.message.issue.issue_actions,
+      //           complainant_actions:
+      //             issueRequest.message.issue.issue_actions.complainant_actions,
+      //           respondent_actions: [
+      //             ...logistics_on_issue_status?.[0]?.message?.issue
+      //               ?.issue_actions?.respondent_actions,
+      //           ],
+      //         },
+      //       },
+      //     },
+      //   },
+      // });
 
       return res.status(200).send({
         context: null,
