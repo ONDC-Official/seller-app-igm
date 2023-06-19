@@ -5,7 +5,7 @@ import {
   OmittedProviderNameFromItems,
   RespondentAction,
 } from "../interfaces/BaseInterface";
-import LogisticsSelectedRequest from "../Model/SelectedLogistics";
+import LogisticsSelectedRequest from "../model/SelectedLogistics";
 
 class LogisticsContext {
   hasResolvedAction(array: any[]) {
