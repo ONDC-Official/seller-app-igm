@@ -1,12 +1,11 @@
 import { Request, Response } from "express";
+import axios from "axios";
 import { logger } from "../shared/logger";
-import { Issue } from "../Model/issue";
+import { Issue } from "../model/issue";
 import DbServices from "../utils/DbServices";
 import Scheduler from "node-schedule";
 import { IIssueResponse } from "../interfaces/issue_response";
-
 import { v4 as uuid } from "uuid";
-
 import GatewayIssueService from "./gatewayIssue.service";
 import {
   IBaseIssue,
@@ -19,7 +18,7 @@ import BugzillaService from "./bugzilla.service";
 import { ComplainantAction } from "../interfaces/BaseInterface";
 import LogisticsContext from "../utils/logistics_context";
 import LogisticsService from "./logistics.service";
-import LogisticsSelectedRequest from "../Model/SelectedLogistics";
+import LogisticsSelectedRequest from "../model/SelectedLogistics";
 import { RespondentAction } from "../interfaces/BaseInterface";
 
 const dbServices = new DbServices();
@@ -49,6 +48,16 @@ class IssueService {
     return array?.some(
       (item: RespondentAction) => item?.respondent_action === "CASCADED"
     );
+  }
+  async getItemDetails(items: Item[]) {
+    const itemData = items?.map(async (item: Item) => {
+      const res = await axios.get(
+        `${process.env.SELLER_SERVER_URL}/api/v1/products/${item.id}/ondcGet`
+      );
+      return res.data;
+    });
+    const data = await Promise.all(itemData);
+    return data;
   }
 
   hasKey(obj: object, key: string): boolean {
@@ -115,27 +124,23 @@ class IssueService {
       // create new issue if issues does not exist
       if (issue?.status === 404) {
         // fetching the organization details from the DB
-        const organizationDetails = await dbServices.findOrganizationWithId({
-          organizationId:
-            issuePayload?.message?.issue?.order_details?.provider_id,
-        });
-
-        const itemIds = issuePayload?.message?.issue?.order_details.items.map(
-          (item: Item) => item?.id
+        const fetchedOrgDetails = await axios.get(
+          `${process.env.SELLER_SERVER_URL}/api/v1/organizations/${issuePayload?.message?.issue?.order_details?.provider_id}/ondcGet`
         );
 
-        // fetching the products details
+        const organizationDetails = fetchedOrgDetails?.data?.providerDetail;
 
-        const productsDetails = await dbServices.findProductWithItemId({
-          itemIds: itemIds,
-        });
+        // fetching the products details
+        const finalDatabasePayload: any = await this.getItemDetails(
+          issuePayload?.message?.issue?.order_details.items
+        );
 
         // adding and mapping the product name in the final payload
         const finalpayloadForItems =
           issuePayload?.message?.issue?.order_details?.items.map(
             (item: Item) => {
-              const matchingItem = productsDetails?.find(
-                (prodcut: any) => prodcut?.id === item?.id
+              const matchingItem = finalDatabasePayload?.find(
+                (product: any) => product?._id === item?.id
               );
 
               if (matchingItem) {
@@ -147,12 +152,13 @@ class IssueService {
 
         // fetching the order details
 
-        const orderDetail = await dbServices.findOrderWithIdFromIssueRequest({
-          orderIdFromIssue: issuePayload?.message?.issue?.order_details?.id,
-        });
+        const orderDetails: any = await axios.get(
+          `${process.env.SELLER_SERVER_URL}/api/v1/orders/${issuePayload?.message?.issue?.order_details?.id}/ondcGet`
+        );
+
+        const orderDetail = orderDetails?.data;
 
         //schedule a job for sending respondant action processing after 5 min if Provider has not initiated
-
         Scheduler.scheduleJob(
           gatewayIssueService.startProcessingIssueAfter5Minutes(
             issuePayload.message.issue.created_at
@@ -513,10 +519,7 @@ class IssueService {
 
       // return all issues is Super Admin
       if (req.body?.user?.user?.role?.name === "Super Admin") {
-        const allIssues = await Issue.find({
-          "message.issue.order_details.provider_id":
-            req.body?.user?.user?.organization,
-        })
+        const allIssues = await Issue.find()
           .sort({ "message.issue.created_at": -1 })
           .skip(query.offset * query.limit)
           .limit(query.limit)
