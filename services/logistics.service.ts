@@ -5,7 +5,7 @@ class LogisticsService {
   async issue_logistics(payload: any) {
     try {
       const issue_request = new HttpRequest(
-        `${process.env.PROTOCOL_BASE_URL}/protocol/logistics/v1`,
+        `${process.env.PROTOCOL_BASE_URL}protocol/logistics/v1`,
         "/issue",
         "post",
         payload
@@ -22,7 +22,7 @@ class LogisticsService {
   async issue_status_logistics(payload: any) {
     try {
       const issue_request = new HttpRequest(
-        `${process.env.PROTOCOL_BASE_URL}/protocol/logistics/v1`,
+        `${process.env.PROTOCOL_BASE_URL}protocol/logistics/v1`,
         "/issue_status",
         "post",
         payload
