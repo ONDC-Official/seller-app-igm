@@ -345,6 +345,7 @@ class IssueService {
               message: {
                 issue: {
                   ...issue?.message?.issue,
+                  issue_type: "GRIEVANCE",
                   issue_actions: {
                     respondent_actions: [
                       ...issue?.message?.issue?.issue_actions
@@ -494,15 +495,19 @@ class IssueService {
         limit: parseInt(limit, 10),
       };
 
+      const dbQuery = {
+        "message.issue.order_details.provider_id":
+          req.body?.user?.user?.organization,
+      };
+
       // if organization ID exist in token return specific providers complaints only
       if (req.body?.user?.user?.organization) {
-        const specificProviderIssue = await Issue.find({
-          "message.issue.order_details.provider_id":
-            req.body?.user?.user?.organization,
-        })
+        const specificProviderIssue = await Issue.find(dbQuery)
           .sort({ "message.issue.created_at": -1 })
           .skip(query.offset * query.limit)
           .limit(query.limit);
+
+        const count = await Issue.find(dbQuery).count();
 
         if (specificProviderIssue?.length === 0) {
           return res
@@ -513,7 +518,7 @@ class IssueService {
         return res.status(200).send({
           success: true,
           issues: specificProviderIssue,
-          count: specificProviderIssue?.length,
+          count,
         });
       }
 
@@ -525,6 +530,8 @@ class IssueService {
           .limit(query.limit)
           .lean();
 
+        const count = await Issue.find().count();
+
         if (allIssues?.length === 0) {
           return res
             .status(200)
@@ -534,7 +541,7 @@ class IssueService {
         return res.status(200).send({
           success: true,
           issues: allIssues,
-          count: allIssues?.length,
+          count,
         });
       }
 
