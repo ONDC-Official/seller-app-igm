@@ -20,21 +20,30 @@ class LogisticsContext {
 
   async issuePayload(
     issue: any,
-    logisticsTransactionID: string,
-    created_at: string
+    created_at: string,
+    _logisticsTransactionID?: string
   ) {
     const omittedArray: OmittedProviderNameFromItems =
       issue?.message?.issue?.order_details?.items?.map(
         ({ product_name, ...rest }: any) => rest
       );
 
-    const selectRequest = await LogisticsSelectedRequest.findOne({
+    let selectRequest;
+
+    selectRequest = await LogisticsSelectedRequest.findOne({
       where: {
         transactionId: issue?.context?.transaction_id,
-        providerId: issue?.message.issue.order_details.provider_id,
+        providerId: issue.message.issue.order_details.provider_id,
       },
       order: [["createdAt", "DESC"]],
     });
+
+    const logistics_TransactionID =
+      selectRequest?.getDataValue("selectedLogistics")?.context?.transaction_id;
+    console.log(
+      "🚀 ~ file: logistics_context.ts:42 ~ LogisticsContext ~ logistics_TransactionID:",
+      logistics_TransactionID
+    );
 
     if (
       this.hasResolvedAction(
@@ -49,15 +58,15 @@ class LogisticsContext {
           country: issue?.context?.country,
           city: issue?.context?.city,
           action: "issue",
-          core_version: issue.context.core_version,
+          core_version: issue?.context?.core_version,
           bap_uri: `${process.env.BPP_URI}`,
           bap_id: `${process.env.BPP_ID}`,
           bpp_uri:
             selectRequest?.getDataValue("selectedLogistics")?.context?.bpp_uri,
           bpp_id:
             selectRequest?.getDataValue("selectedLogistics")?.context?.bpp_id,
-          transaction_id: logisticsTransactionID,
-          timestamp: new Date(),
+          transaction_id: logistics_TransactionID,
+          timestamp: new Date().toISOString(),
           message_id: uuid(),
           ttl: issue?.context.ttl,
         },
@@ -118,7 +127,7 @@ class LogisticsContext {
                 issue?.message?.issue?.issue_actions.respondent_actions,
             },
             created_at: created_at,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         },
       };
@@ -129,18 +138,18 @@ class LogisticsContext {
         context: {
           domain:
             selectRequest?.getDataValue("selectedLogistics")?.context?.domain,
-          country: issue.context.country,
+          country: issue?.context?.country,
           city: issue?.context?.city,
           action: "issue",
-          core_version: issue.context.core_version,
+          core_version: issue?.context?.core_version,
           bap_uri: `${process.env.BPP_URI}`,
           bap_id: `${process.env.BPP_ID}`,
           bpp_uri:
             selectRequest?.getDataValue("selectedLogistics")?.context.bpp_uri,
           bpp_id:
             selectRequest?.getDataValue("selectedLogistics")?.context.bpp_id,
-          transaction_id: logisticsTransactionID,
-          timestamp: new Date(),
+          transaction_id: logistics_TransactionID,
+          timestamp: new Date().toISOString(),
           message_id: uuid(),
           ttl: issue?.context.ttl,
         },
@@ -199,10 +208,14 @@ class LogisticsContext {
                 issue?.message?.issue?.issue_actions.respondent_actions,
             },
             created_at: created_at,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         },
       };
+      console.log(
+        "🚀 ~ file: logistics_context.ts:240 ~ LogisticsContext ~ issuePayload:",
+        issuePayload
+      );
 
       return issuePayload;
     }

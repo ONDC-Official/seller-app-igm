@@ -198,7 +198,7 @@ class IssueService {
                     {
                       respondent_action: "PROCESSING",
                       short_desc: "We are investigating your concern.",
-                      updated_at: new Date(),
+                      updated_at: new Date().toISOString(),
                       updated_by: {
                         org: {
                           name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
@@ -216,7 +216,7 @@ class IssueService {
                     {
                       respondent_action: "CASCADED",
                       short_desc: "We have sent your request to logistics.",
-                      updated_at: new Date(),
+                      updated_at: new Date().toISOString(),
                       updated_by: {
                         org: {
                           name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
@@ -257,7 +257,7 @@ class IssueService {
         const createIssuePayload: IssueRequest = {
           context: {
             ...issuePayload.context,
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(),
             action: "on_issue_status",
             core_version: "1.0.0",
             ttl: issuePayload.context.ttl,
@@ -353,7 +353,7 @@ class IssueService {
                       {
                         respondent_action: "PROCESSING",
                         short_desc: "We are looking into your concern.",
-                        updated_at: new Date(),
+                        updated_at: new Date().toISOString(),
                         updated_by: {
                           org: {
                             name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
@@ -583,7 +583,7 @@ class IssueService {
         long_desc: req.body.long_desc,
         respondent_action: req.body.respondent_action,
         short_desc: req.body.short_desc,
-        updated_at: new Date(),
+        updated_at: new Date().toISOString(),
         updated_by: {
           org: {
             name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
@@ -624,6 +624,12 @@ class IssueService {
           keyPathForUpdating: "message.issue",
           issueSchema: schemaPayloadForDatabase,
         });
+
+        if (payload.respondent_action === "CASCADED") {
+          this.issueResponseCasecaded({
+            issuePayload: fetchedIssueFromDataBase,
+          });
+        }
 
         await Scheduler.gracefulShutdown();
 
@@ -731,7 +737,7 @@ class IssueService {
           bpp_uri: bpp_uri,
           transaction_id: transaction_id,
           message_id: message_id,
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
         },
         message: {
           issue_id: issue_id,
@@ -836,6 +842,7 @@ class IssueService {
         },
         message: {
           issue: {
+            ...issueRequest.message.issue,
             ...retail_issue?.[0].message.issue,
             issue_actions: {
               respondent_actions: [
@@ -850,7 +857,6 @@ class IssueService {
       const transaction_id = retail_issue?.[0]?.context?.transaction_id;
 
       const data = {
-        // ...issueRequest,
         context: {
           ...mergedIssueWithLogistics.context,
           ttl: issueRequest.context.ttl,
@@ -858,6 +864,7 @@ class IssueService {
         message: {
           issue: {
             ...mergedIssueWithLogistics.message.issue,
+            order_details: issueRequest.message.issue.order_details,
             issue_actions: {
               ...mergedIssueWithLogistics.message.issue.issue_actions,
               complainant_actions:
@@ -865,6 +872,7 @@ class IssueService {
             },
           },
         },
+        logisticsTransactionId: issueRequest.logisticsTransactionId,
       };
 
       await dbServices.findAndUpdateWholeDocument({
@@ -964,7 +972,6 @@ class IssueService {
         message: {
           issue: {
             ...issueRequest.message.issue,
-            ...logistics_on_issue_status?.[0].message.issue,
             issue_actions: {
               ...issueRequest.message.issue.issue_actions,
               complainant_actions:
@@ -1019,7 +1026,7 @@ class IssueService {
           ...fetchedIssueFromDataBase.context,
           action: "on_issue_status",
           core_version: "1.0.0",
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           message_id: uuid(),
         },
         message: {
@@ -1033,7 +1040,7 @@ class IssueService {
                   cascaded_level: 1,
                   respondent_action: payload.respondent_action,
                   short_desc: payload.short_desc,
-                  updated_at: new Date(),
+                  updated_at: new Date().toISOString(),
                   updated_by: {
                     contact: {
                       email: payload.updated_by.contact.email,
@@ -1047,7 +1054,7 @@ class IssueService {
                 },
               ],
             },
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         },
       };
@@ -1057,7 +1064,7 @@ class IssueService {
           ...fetchedIssueFromDataBase.context,
           action: "on_issue_status",
           core_version: "1.0.0",
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           message_id: uuid(),
         },
         message: {
@@ -1071,7 +1078,7 @@ class IssueService {
                   cascaded_level: 1,
                   respondent_action: "RESOLVED",
                   short_desc: payload.short_desc,
-                  updated_at: new Date(),
+                  updated_at: new Date().toISOString(),
                   updated_by: {
                     contact: {
                       email: payload.updated_by.contact.email,
@@ -1123,7 +1130,7 @@ class IssueService {
                 },
               },
             },
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         },
       };
@@ -1133,7 +1140,7 @@ class IssueService {
           ...fetchedIssueFromDataBase.context,
           action: "on_issue_status",
           core_version: "1.0.0",
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           message_id: uuid(),
         },
         message: {
@@ -1147,7 +1154,7 @@ class IssueService {
                   cascaded_level: 1,
                   respondent_action: payload.respondent_action,
                   short_desc: payload.short_desc,
-                  updated_at: new Date(),
+                  updated_at: new Date().toISOString(),
                   updated_by: {
                     contact: {
                       email: payload.updated_by.contact.email,
@@ -1198,7 +1205,7 @@ class IssueService {
                 },
               },
             },
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           },
         },
       };
@@ -1263,8 +1270,74 @@ class IssueService {
           },
         },
       },
-      updated_at: new Date(),
+      updated_at: new Date().toISOString(),
     };
+  }
+
+  async issueResponseCasecaded({ issuePayload }: { issuePayload: any }) {
+    const selectRequest = await LogisticsSelectedRequest.findOne({
+      where: {
+        transactionId: issuePayload?.context?.transaction_id,
+        providerId: issuePayload.message.issue.order_details.provider_id,
+      },
+      order: [["createdAt", "DESC"]],
+    });
+
+    const transaction_id =
+      selectRequest?.getDataValue("selectedLogistics")?.context?.transaction_id;
+
+    const issuePayloadLogisticsAndOn_issue = {
+      context: { ...issuePayload.context },
+      message: {
+        issue: {
+          ...issuePayload?.message?.issue,
+          issue_actions: {
+            ...issuePayload?.message?.issue?.issue_actions,
+            respondent_actions: [
+              ...issuePayload?.message?.issue?.issue_actions.respondent_actions,
+              {
+                respondent_action: "CASCADED",
+                short_desc: "We have sent your request to logistics.",
+                updated_at: new Date().toISOString(),
+                updated_by: {
+                  org: {
+                    name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                  },
+                  contact: {
+                    phone: "9876543210",
+                    email: "Rishabhnand.singh@ondc.org",
+                  },
+                  person: {
+                    name: "Rishabhnand Singh",
+                  },
+                },
+                cascaded_level: 2,
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    const payloadForLogistics = await logisticsContext.issuePayload(
+      issuePayloadLogisticsAndOn_issue,
+      new Date().toISOString(),
+      transaction_id
+    );
+
+    const response: any = await logisticsService.issue_logistics(
+      payloadForLogistics
+    );
+
+    if (response?.data?.message?.ack?.status === "ACK") {
+      await dbServices.addOrUpdateIssueWithKeyValue({
+        issueKeyToFind: "context.transaction_id",
+        issueValueToFind: issuePayload.context.transaction_id,
+        keyPathForUpdating: "message.issue.issue_actions.respondent_actions",
+        issueSchema:
+          payloadForLogistics.message.issue.issue_actions.respondent_actions,
+      });
+    }
   }
 }
 
