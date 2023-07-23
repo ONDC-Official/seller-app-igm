@@ -4,7 +4,7 @@ export interface IIssueResponse {
   long_desc: string;
   respondent_action: string;
   short_desc: string;
-  updated_at: Date;
+  updated_at: string;
   cascaded_level: number;
   action_triggered:string
   updated_by: {

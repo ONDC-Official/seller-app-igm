@@ -1,4 +1,20 @@
 import mongoose, { Schema } from "mongoose";
+
+const Fulfillments = new mongoose.Schema(
+  {
+    id: { type: String },
+    state: { type: String },
+  },
+  { _id: false } // Disable _id for subdocuments
+);
+
+Fulfillments.set("toObject", {
+  transform: (_doc, ret) => {
+    delete ret._id;
+    return ret;
+  },
+});
+
 const issueSchema = new Schema({
   context: {
     domain: { type: String },
@@ -34,12 +50,10 @@ const issueSchema = new Schema({
         orderDetailsId: { type: String },
         state: { type: String },
         items: Object,
-        fulfillments: [
-          {
-            id: { type: String },
-            state: { type: String },
-          },
-        ],
+        fulfillments: {
+          type: [Fulfillments],
+          default: [],
+        },
         provider_id: { type: String },
         provider_name: { type: String },
         order_created: { type: Date },

@@ -40,7 +40,7 @@ class GatewayIssueService {
         bpp_uri: payload.context.bpp_uri,
         transaction_id: payload.context.transaction_id,
         message_id: payload.context.message_id,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       },
       message: {
         issue: {
@@ -50,7 +50,7 @@ class GatewayIssueService {
               {
                 respondent_action: "PROCESSING",
                 short_desc: "We are investigating your concern.",
-                updated_at: new Date(),
+                updated_at: new Date().toISOString(),
                 updated_by: {
                   org: {
                     name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
@@ -68,7 +68,7 @@ class GatewayIssueService {
             ],
           },
           created_at: payload.message.issue.created_at,
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(),
         },
       },
     };
@@ -100,7 +100,7 @@ class GatewayIssueService {
         ],
       });
 
-      const response = await this.on_issue_status({
+      const response = await this.on_issue({
         data: onIssuePayload,
         message_id: uuidv4(),
       });
@@ -157,10 +157,11 @@ class GatewayIssueService {
               payload.message.issue.issue_actions.respondent_actions,
           },
           created_at: payload.message.issue.created_at,
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(),
         },
       },
     };
+
     try {
       const createBug = new PostHttpRequest({
         url: "/on_issue",
@@ -214,7 +215,7 @@ class GatewayIssueService {
             bpp_uri: data?.context?.bpp_uri,
             transaction_id: data?.context?.transaction_id,
             message_id: message_id,
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(),
           },
           message: {
             issue: {
@@ -244,7 +245,7 @@ class GatewayIssueService {
             bpp_uri: data?.context?.bpp_uri,
             transaction_id: data?.context?.transaction_id,
             message_id: message_id,
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(),
           },
           message: {
             issue: {

@@ -160,7 +160,7 @@ export interface Context {
   bpp_uri: string;
   transaction_id: string;
   message_id: string;
-  timestamp: Date;
+  timestamp: string;
   ttl: string;
 }
 export interface Message {
@@ -189,7 +189,7 @@ export interface Issue {
   resolution: Resolution | ResolutionWithoutRefund;
   resolution_provider: ResolutionProvider;
   created_at: string;
-  updated_at: Date;
+  updated_at: string;
 }
 
 export interface ResolutionProvider {
@@ -285,7 +285,7 @@ export interface UpdatedBy {
 export interface RespondentAction {
   respondent_action: string;
   short_desc: string;
-  updated_at: Date;
+  updated_at: string;
   updated_by: UpdatedBy;
   cascaded_level: number;
 }
