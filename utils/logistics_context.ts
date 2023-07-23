@@ -40,10 +40,6 @@ class LogisticsContext {
 
     const logistics_TransactionID =
       selectRequest?.getDataValue("selectedLogistics")?.context?.transaction_id;
-    console.log(
-      "🚀 ~ file: logistics_context.ts:42 ~ LogisticsContext ~ logistics_TransactionID:",
-      logistics_TransactionID
-    );
 
     if (
       this.hasResolvedAction(
@@ -212,10 +208,6 @@ class LogisticsContext {
           },
         },
       };
-      console.log(
-        "🚀 ~ file: logistics_context.ts:240 ~ LogisticsContext ~ issuePayload:",
-        issuePayload
-      );
 
       return issuePayload;
     }

@@ -313,6 +313,17 @@ class IssueService {
               updatedIssueForBugzilla?.message?.issue?.issue_actions,
           });
 
+          if (issuePayload.message.issue.status === "CLOSED") {
+           await bugzillaService.updateIssueInBugzilla({
+              resolved: true,
+              transaction_id: issue?.context?.transaction_id,
+              issue_actions: {
+                ...issue?.message?.issue?.issue_actions,
+                ...issuePayload?.message?.issue?.issue_actions,
+              },
+            });
+          }
+
           return res.status(201).send({
             status: 201,
             success: true,
@@ -561,6 +572,7 @@ class IssueService {
    */
   async issue_response(req: Request, res: Response) {
     let payloadForResolvedissue: OnIssueStatusResoloved;
+    let response;
     try {
       const fetchedIssueFromDataBase: IBaseIssue & {
         status: number;
@@ -606,10 +618,17 @@ class IssueService {
         fetchedIssueFromDataBase,
       });
 
-      const response = await gatewayIssueService.on_issue_status({
-        data: payloadForResolvedissue,
-        message_id: payloadForResolvedissue.context.message_id,
-      });
+      if (
+        fetchedIssueFromDataBase.message.issue.issue_actions.respondent_actions
+          .length === 0
+      ) {
+        response = await gatewayIssueService.on_issue(payloadForResolvedissue);
+      } else {
+        response = await gatewayIssueService.on_issue_status({
+          data: payloadForResolvedissue,
+          message_id: uuid(),
+        });
+      }
 
       if (response?.data.message?.ack?.status === "ACK") {
         const schemaPayloadForDatabase =

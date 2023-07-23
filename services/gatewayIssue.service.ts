@@ -100,7 +100,7 @@ class GatewayIssueService {
         ],
       });
 
-      const response = await this.on_issue_status({
+      const response = await this.on_issue({
         data: onIssuePayload,
         message_id: uuidv4(),
       });
@@ -161,6 +161,7 @@ class GatewayIssueService {
         },
       },
     };
+
     try {
       const createBug = new PostHttpRequest({
         url: "/on_issue",
