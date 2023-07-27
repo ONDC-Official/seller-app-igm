@@ -1047,7 +1047,7 @@ class IssueService {
           action: "on_issue_status",
           core_version: "1.0.0",
           timestamp: new Date().toISOString(),
-          message_id: uuid(),
+          message_id: fetchedIssueFromDataBase.message.issue.id,
         },
         message: {
           issue: {
