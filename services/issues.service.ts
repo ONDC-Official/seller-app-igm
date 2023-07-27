@@ -314,7 +314,7 @@ class IssueService {
           });
 
           if (issuePayload.message.issue.status === "CLOSED") {
-           await bugzillaService.updateIssueInBugzilla({
+            await bugzillaService.updateIssueInBugzilla({
               resolved: true,
               transaction_id: issue?.context?.transaction_id,
               issue_actions: {
@@ -395,6 +395,7 @@ class IssueService {
                 keyPathForUpdating: "message.issue",
                 issueSchema: {
                   ...issue?.message?.issue,
+                  updated_at: issuePayload.message.issue.updated_at,
                   issue_actions: {
                     complainant_actions:
                       issuePayload?.message?.issue?.issue_actions
@@ -1046,7 +1047,7 @@ class IssueService {
           action: "on_issue_status",
           core_version: "1.0.0",
           timestamp: new Date().toISOString(),
-          message_id: uuid(),
+          message_id: fetchedIssueFromDataBase.message.issue.id,
         },
         message: {
           issue: {
