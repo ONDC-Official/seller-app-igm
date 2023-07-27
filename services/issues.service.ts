@@ -265,14 +265,12 @@ class IssueService {
           message: {
             issue: {
               ...issuePayload.message.issue,
-
               order_details: {
                 ...issuePayload.message.issue.order_details,
                 provider_name: organizationDetails.name,
                 items: finalpayloadForItems,
                 orderDetailsId: orderDetail["_id"],
               },
-
               issue_actions: {
                 complainant_actions:
                   issuePayload.message.issue.issue_actions.complainant_actions,
@@ -357,6 +355,7 @@ class IssueService {
                 issue: {
                   ...issue?.message?.issue,
                   issue_type: "GRIEVANCE",
+                  updated_at: new Date().toISOString(),
                   issue_actions: {
                     respondent_actions: [
                       ...issue?.message?.issue?.issue_actions
