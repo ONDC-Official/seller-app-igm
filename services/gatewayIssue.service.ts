@@ -100,10 +100,7 @@ class GatewayIssueService {
         ],
       });
 
-      const response = await this.on_issue({
-        data: onIssuePayload,
-        message_id: uuidv4(),
-      });
+      const response = await this.on_issue(onIssuePayload);
 
       return response;
     } catch (error) {
