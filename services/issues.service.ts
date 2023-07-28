@@ -394,6 +394,7 @@ class IssueService {
                 keyPathForUpdating: "message.issue",
                 issueSchema: {
                   ...issue?.message?.issue,
+                  issue_type: "GRIEVANCE",
                   updated_at: issuePayload.message.issue.updated_at,
                   issue_actions: {
                     complainant_actions:
@@ -582,6 +583,11 @@ class IssueService {
         key: "context.transaction_id",
         value: req.body.transaction_id,
       });
+
+      console.log(
+        "🚀 ~ file: issues.service.ts:579 ~ IssueService ~ issue_response ~ fetchedIssueFromDataBase:",
+        JSON.stringify(fetchedIssueFromDataBase)
+      );
 
       if (fetchedIssueFromDataBase.status === 404) {
         return res
@@ -1043,10 +1049,10 @@ class IssueService {
       payloadForResolvedissue = {
         context: {
           ...fetchedIssueFromDataBase.context,
-          action: "on_issue_status",
+          action: "on_issue",
           core_version: "1.0.0",
           timestamp: new Date().toISOString(),
-          message_id: fetchedIssueFromDataBase.message.issue.id,
+          message_id: fetchedIssueFromDataBase.context.message_id,
         },
         message: {
           issue: {
