@@ -160,8 +160,9 @@ class IssueService {
 
         //schedule a job for sending respondant action processing after 5 min if Provider has not initiated
         Scheduler.scheduleJob(
-          gatewayIssueService.startProcessingIssueAfter5Minutes(
-            issuePayload.message.issue.created_at
+          gatewayIssueService.startProcessingBeforeExpectedTime(
+            issuePayload.message.issue.created_at,
+            issuePayload.message.issue.expected_response_time.duration
           ),
 
           async () => {

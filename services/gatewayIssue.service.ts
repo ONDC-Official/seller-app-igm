@@ -113,16 +113,27 @@ class GatewayIssueService {
    * @param {*} dateString    Date and Time "2023-05-28T15:30:30.349Z"
    */
 
-  startProcessingIssueAfter5Minutes(dateString: string) {
-    const dateObj = new Date(dateString);
+  startProcessingBeforeExpectedTime(
+    initialDateTime: string,
+    duration: string
+  ): string | null {
+    const initialDate = new Date(initialDateTime);
 
-    // Add 5 minutes to the Date object
-    dateObj.setTime(dateObj.getTime() + 5 * 60000); // 5 minutes = 5 * 60 seconds * 1000 milliseconds
+    const durationPattern = /PT(\d+)H/;
+    const match = duration.match(durationPattern);
 
-    // Convert the new Date object back to the ISO 8601 format
-    const newDateString = dateObj.toISOString();
+    if (match) {
+      const hours = parseInt(match[1]);
+      const updatedDate = new Date(initialDate);
+      updatedDate.setHours(updatedDate.getHours() + hours);
 
-    return newDateString;
+      // Subtract 1 minute
+      updatedDate.setMinutes(updatedDate.getMinutes() - 1);
+
+      return updatedDate.toISOString();
+    } else {
+      return null;
+    }
   }
 
   /**
