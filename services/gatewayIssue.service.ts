@@ -8,6 +8,7 @@ import {
 } from "../interfaces/BaseInterface";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "../shared/logger";
+import axios from "axios";
 
 const dbServices = new DbServices();
 class GatewayIssueService {
@@ -27,6 +28,11 @@ class GatewayIssueService {
     transaction_id: string;
     payload: IssueRequest;
   }) {
+    const fetchedOrgDetails = await axios.get(
+      `${process.env.SELLER_SERVER_URL}/api/v1/organizations/${payload?.message?.issue?.order_details?.provider_id}/ondcGet`
+    );
+
+    const organizationDetails = fetchedOrgDetails?.data?.providerDetail;
     const onIssuePayload: OnIssue = {
       context: {
         domain: payload.context.domain,
@@ -56,11 +62,11 @@ class GatewayIssueService {
                     name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
                   },
                   contact: {
-                    phone: "9876543210",
-                    email: "Rishabhnand.singh@ondc.org",
+                    phone: organizationDetails.contactMobile,
+                    email: organizationDetails.contactEmail,
                   },
                   person: {
-                    name: "Rishabhnand Singh",
+                    name: organizationDetails.name,
                   },
                 },
                 cascaded_level: 1,
@@ -88,11 +94,11 @@ class GatewayIssueService {
                 name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
               },
               contact: {
-                phone: "6239083807",
-                email: "Rishabhnand.singh@ondc.org",
+                phone: organizationDetails.contactMobile,
+                email: organizationDetails.contactEmail,
               },
               person: {
-                name: "Rishabhnand Singh",
+                name: organizationDetails.name,
               },
             },
             cascaded_level: 1,
@@ -116,7 +122,7 @@ class GatewayIssueService {
   startProcessingBeforeExpectedTime(
     initialDateTime: string,
     duration: string
-  ): string | null {
+  ): string {
     const initialDate = new Date(initialDateTime);
 
     const durationPattern = /PT(\d+)H/;
@@ -132,7 +138,7 @@ class GatewayIssueService {
 
       return updatedDate.toISOString();
     } else {
-      return null;
+      return "";
     }
   }
 
@@ -155,7 +161,7 @@ class GatewayIssueService {
         bpp_uri: payload.context.bpp_uri,
         transaction_id: payload.context.transaction_id,
         message_id: payload.context.message_id,
-        timestamp: payload.context.timestamp,
+        timestamp: new Date().toISOString(),
       },
       message: {
         issue: {

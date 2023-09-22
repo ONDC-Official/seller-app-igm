@@ -1,6 +1,7 @@
 version: "3.8"
 services:
   backend:
+    dockerfile: Dockerfile
     container_name: seller-igm-node
     build: .
     ports:
