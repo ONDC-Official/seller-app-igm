@@ -155,5 +155,14 @@ const issueSchema = new Schema({
   logisticsTransactionId: {
     type: String,
   },
+  orgEmail: {
+    type: String,
+  },
+  orgName: {
+    type: String,
+  },
+  orgMobile: {
+    type: String,
+  },
 });
 export const Issue = mongoose.model("Issue", issueSchema);

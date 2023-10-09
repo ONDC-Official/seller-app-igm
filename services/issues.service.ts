@@ -121,15 +121,18 @@ class IssueService {
         await logisticsService.issue_logistics(payloadForLogistics);
       }
 
-      // create new issue if issues does not exist
+      let organizationDetails;
       if (issue?.status === 404) {
         // fetching the organization details from the DB
         const fetchedOrgDetails = await axios.get(
           `${process.env.SELLER_SERVER_URL}/api/v1/organizations/${issuePayload?.message?.issue?.order_details?.provider_id}/ondcGet`
         );
 
-        const organizationDetails = fetchedOrgDetails?.data?.providerDetail;
+        organizationDetails = fetchedOrgDetails?.data?.providerDetail;
+      }
 
+      // create new issue if issues does not exist
+      if (issue?.status === 404) {
         // fetching the products details
         const finalDatabasePayload: any = await this.getItemDetails(
           issuePayload?.message?.issue?.order_details.items
@@ -150,18 +153,21 @@ class IssueService {
             }
           );
 
+        let orderDetail;
+
         // fetching the order details
 
         const orderDetails: any = await axios.get(
           `${process.env.SELLER_SERVER_URL}/api/v1/orders/${issuePayload?.message?.issue?.order_details?.id}/ondcGet`
         );
 
-        const orderDetail = orderDetails?.data;
+        orderDetail = orderDetails?.data;
 
         //schedule a job for sending respondant action processing after 5 min if Provider has not initiated
         Scheduler.scheduleJob(
-          gatewayIssueService.startProcessingIssueAfter5Minutes(
-            issuePayload.message.issue.created_at
+          gatewayIssueService.startProcessingBeforeExpectedTime(
+            issuePayload.message.issue.created_at,
+            issuePayload.message.issue.expected_response_time.duration
           ),
 
           async () => {
@@ -204,11 +210,11 @@ class IssueService {
                           name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
                         },
                         contact: {
-                          phone: "9876543210",
-                          email: "Rishabhnand.singh@ondc.org",
+                          phone: organizationDetails.contactMobile,
+                          email: organizationDetails.contactEmail,
                         },
                         person: {
-                          name: "Rishabhnand Singh",
+                          name: organizationDetails.name,
                         },
                       },
                       cascaded_level: 1,
@@ -222,11 +228,11 @@ class IssueService {
                           name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
                         },
                         contact: {
-                          phone: "9876543210",
-                          email: "Rishabhnand.singh@ondc.org",
+                          phone: organizationDetails.contactMobile,
+                          email: organizationDetails.contactEmail,
                         },
                         person: {
-                          name: "Rishabhnand Singh",
+                          name: organizationDetails.name,
                         },
                       },
                       cascaded_level: 2,
@@ -281,6 +287,9 @@ class IssueService {
             },
           },
           logisticsTransactionId: transaction_id,
+          orgEmail: organizationDetails.contactEmail,
+          orgName: organizationDetails.name,
+          orgMobile: organizationDetails.contactMobile,
         };
 
         //creating issue
@@ -343,6 +352,10 @@ class IssueService {
       // hit on_issue if any issue complainent action contains ESCALTED
 
       if (complaintActionLength !== 0) {
+        console.log(
+          'complaint?.complainant_action === "ESCALATE" &&',
+          issuePayload.message.issue.status !== "CLOSED"
+        );
         for (const complaint of issuePayload?.message?.issue?.issue_actions
           .complainant_actions) {
           if (
@@ -370,11 +383,11 @@ class IssueService {
                             name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
                           },
                           contact: {
-                            phone: "9876543210",
-                            email: "Rishabhnand.singh@ondc.org",
+                            phone: issue.orgMobile,
+                            email: issue.orgEmail,
                           },
                           person: {
-                            name: "Rishabhnand Singh",
+                            name: issue.orgName,
                           },
                         },
                         cascaded_level: 1,
@@ -1044,10 +1057,10 @@ class IssueService {
       payloadForResolvedissue = {
         context: {
           ...fetchedIssueFromDataBase.context,
-          action: "on_issue_status",
+          action: "on_issue",
           core_version: "1.0.0",
           timestamp: new Date().toISOString(),
-          message_id: fetchedIssueFromDataBase.message.issue.id,
+          message_id: fetchedIssueFromDataBase.context.message_id,
         },
         message: {
           issue: {
@@ -1295,68 +1308,86 @@ class IssueService {
   }
 
   async issueResponseCasecaded({ issuePayload }: { issuePayload: any }) {
-    const selectRequest = await LogisticsSelectedRequest.findOne({
-      where: {
-        transactionId: issuePayload?.context?.transaction_id,
-        providerId: issuePayload.message.issue.order_details.provider_id,
-      },
-      order: [["createdAt", "DESC"]],
-    });
+    try {
+      const selectRequest = await LogisticsSelectedRequest.findOne({
+        where: {
+          transactionId: issuePayload?.context?.transaction_id,
+          providerId: issuePayload.message.issue.order_details.provider_id,
+        },
+        order: [["createdAt", "DESC"]],
+      });
 
-    const transaction_id =
-      selectRequest?.getDataValue("selectedLogistics")?.context?.transaction_id;
+      // fetching the organization details from the DB
+      const fetchedOrgDetails = await axios.get(
+        `${process.env.SELLER_SERVER_URL}/api/v1/organizations/${issuePayload?.message?.issue?.order_details?.provider_id}/ondcGet`
+      );
 
-    const issuePayloadLogisticsAndOn_issue = {
-      context: { ...issuePayload.context },
-      message: {
-        issue: {
-          ...issuePayload?.message?.issue,
-          issue_actions: {
-            ...issuePayload?.message?.issue?.issue_actions,
-            respondent_actions: [
-              ...issuePayload?.message?.issue?.issue_actions.respondent_actions,
-              {
-                respondent_action: "CASCADED",
-                short_desc: "We have sent your request to logistics.",
-                updated_at: new Date().toISOString(),
-                updated_by: {
-                  org: {
-                    name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+      const organizationDetails = fetchedOrgDetails?.data?.providerDetail;
+
+      console.log(
+        "🚀 ~ file: issues.service.ts:130 ~ IssueService ~ createIssue ~ organizationDetails:",
+        JSON.stringify(organizationDetails)
+      );
+
+      const transaction_id =
+        selectRequest?.getDataValue("selectedLogistics")?.context
+          ?.transaction_id;
+
+      const issuePayloadLogisticsAndOn_issue = {
+        context: { ...issuePayload.context },
+        message: {
+          issue: {
+            ...issuePayload?.message?.issue,
+            issue_actions: {
+              ...issuePayload?.message?.issue?.issue_actions,
+              respondent_actions: [
+                ...issuePayload?.message?.issue?.issue_actions
+                  .respondent_actions,
+                {
+                  respondent_action: "CASCADED",
+                  short_desc: "We have sent your request to logistics.",
+                  updated_at: new Date().toISOString(),
+                  updated_by: {
+                    org: {
+                      name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                    },
+                    contact: {
+                      phone: organizationDetails.contactMobile,
+                      email: organizationDetails.contactEmail,
+                    },
+                    person: {
+                      name: organizationDetails.name,
+                    },
                   },
-                  contact: {
-                    phone: "9876543210",
-                    email: "Rishabhnand.singh@ondc.org",
-                  },
-                  person: {
-                    name: "Rishabhnand Singh",
-                  },
+                  cascaded_level: 2,
                 },
-                cascaded_level: 2,
-              },
-            ],
+              ],
+            },
           },
         },
-      },
-    };
+      };
 
-    const payloadForLogistics = await logisticsContext.issuePayload(
-      issuePayloadLogisticsAndOn_issue,
-      new Date().toISOString(),
-      transaction_id
-    );
+      const payloadForLogistics = await logisticsContext.issuePayload(
+        issuePayloadLogisticsAndOn_issue,
+        new Date().toISOString(),
+        transaction_id
+      );
 
-    const response: any = await logisticsService.issue_logistics(
-      payloadForLogistics
-    );
+      const response: any = await logisticsService.issue_logistics(
+        payloadForLogistics
+      );
 
-    if (response?.data?.message?.ack?.status === "ACK") {
-      await dbServices.addOrUpdateIssueWithKeyValue({
-        issueKeyToFind: "context.transaction_id",
-        issueValueToFind: issuePayload.context.transaction_id,
-        keyPathForUpdating: "message.issue.issue_actions.respondent_actions",
-        issueSchema:
-          payloadForLogistics.message.issue.issue_actions.respondent_actions,
-      });
+      if (response?.data?.message?.ack?.status === "ACK") {
+        await dbServices.addOrUpdateIssueWithKeyValue({
+          issueKeyToFind: "context.transaction_id",
+          issueValueToFind: issuePayload.context.transaction_id,
+          keyPathForUpdating: "message.issue.issue_actions.respondent_actions",
+          issueSchema:
+            payloadForLogistics.message.issue.issue_actions.respondent_actions,
+        });
+      }
+    } catch (err) {
+      console.log(err);
     }
   }
 }
