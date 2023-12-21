@@ -9,7 +9,7 @@ const app = createServer();
 try {
   dbConnect()
     .then(() => {
-      logger.info("Database connection successful");
+      logger.info("Mongo Database connection successful");
       app.listen(port, (): void => {
         logger.info(`Connected successfully on port ${port}`);
       });

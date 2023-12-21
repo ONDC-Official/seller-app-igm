@@ -1,11 +1,12 @@
-import * as dotenv from "dotenv";
+import "dotenv/config";
 import express, { Application, Request, Response } from "express";
 import issueRoutes from "./routes/issue.routes";
 import logisticsRoutes from "./routes/logistics.routes";
 
-dotenv.config();
-
 const createServer = (): express.Application => {
+  if (!process.env.BPP_URI) {
+    throw new Error("BPP_URI is required for IGM to work");
+  }
   const app: Application = express();
 
   // Body parsing Middleware

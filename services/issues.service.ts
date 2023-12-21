@@ -1058,6 +1058,7 @@ class IssueService {
         context: {
           ...fetchedIssueFromDataBase.context,
           action: "on_issue",
+          bpp_uri: process.env.BPP_URI || "",
           core_version: "1.0.0",
           timestamp: new Date().toISOString(),
           message_id: fetchedIssueFromDataBase.context.message_id,
