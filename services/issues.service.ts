@@ -333,10 +333,10 @@ class IssueService {
             });
           }
 
-          return res.status(201).send({
-            status: 201,
+          return res.status(200).send({
+            status: 200,
             success: true,
-            message: "Issue has been created",
+            message : {ack : { status: "ACK" }}
           });
         } catch (e) {
           return res.status(500).send({
