@@ -1,12 +1,10 @@
 import { Sequelize } from "sequelize";
-import dotenv from "dotenv";
-
-dotenv.config();
+import "dotenv/config";
 
 const sequelize = new Sequelize(
-  `${process.env.PG_DATABASE}`,
-  `${process.env.PG_USER}`,
-  `${process.env.PG_PASSWORD}`,
+  process.env.CLIENT_PG_DATABASE || "seller_client",
+  process.env.CLIENT_PG_USER || "bpp_client",
+  process.env.CLIENT_PG_PASSWORD || "bpp_client",
   {
     host: process.env.PG_HOST,
     dialect: "postgres",

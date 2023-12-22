@@ -70,6 +70,7 @@ class IssueService {
    * @param {*} res    HTTP response object
    */
   async createIssue(req: Request, res: Response) {
+
     const issuePayload: IssueRequest = req.body;
 
     const item_subcategories = ["FLM01", "FLM02", "FLM03"];
@@ -85,6 +86,7 @@ class IssueService {
         item_subcategories.includes(issue?.message?.issue?.sub_category) &&
         !this.hasKey(issue, "status")
       ) {
+
         const selectRequest = await LogisticsSelectedRequest.findOne({
           where: {
             transactionId: issue.context?.transaction_id,
@@ -152,9 +154,8 @@ class IssueService {
               return item;
             }
           );
-
+        
         let orderDetail;
-
         // fetching the order details
 
         const orderDetails: any = await axios.get(
@@ -162,7 +163,7 @@ class IssueService {
         );
 
         orderDetail = orderDetails?.data;
-
+        
         //schedule a job for sending respondant action processing after 5 min if Provider has not initiated
         Scheduler.scheduleJob(
           gatewayIssueService.startProcessingBeforeExpectedTime(
@@ -190,6 +191,10 @@ class IssueService {
         const transaction_id =
           selectRequest?.getDataValue("selectedLogistics")?.context
             ?.transaction_id;
+
+            logger.info("transaction_id logistics",transaction_id)
+
+            
         if (
           item_subcategories.includes(issuePayload.message.issue.sub_category)
         ) {
@@ -258,13 +263,18 @@ class IssueService {
 
             await Scheduler.gracefulShutdown();
           }
+          return res.status(200).send({
+            status: 200,
+            success: true,
+            message: {"ack": {"status": "ACK"}} // WARN: This should be a ack builder 
+          });
         }
 
         const createIssuePayload: IssueRequest = {
           context: {
             ...issuePayload.context,
             timestamp: new Date().toISOString(),
-            action: "on_issue_status",
+            action: "on_issue",
             core_version: "1.0.0",
             ttl: issuePayload.context.ttl,
           },
@@ -282,7 +292,26 @@ class IssueService {
               issue_actions: {
                 complainant_actions:
                   issuePayload.message.issue.issue_actions.complainant_actions,
-                respondent_actions: [],
+                respondent_actions: [
+                  {
+                    respondent_action: "PROCESSING",
+                    short_desc: "We are investigating your concern.",
+                    updated_at: new Date().toISOString(),
+                    updated_by: {
+                      org: {
+                        name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                      },
+                      contact: {
+                        phone: organizationDetails.contactMobile,
+                        email: organizationDetails.contactEmail,
+                      },
+                      person: {
+                        name: organizationDetails.name,
+                      },
+                    },
+                    cascaded_level: 0,
+                  }
+                ],
               },
             },
           },
@@ -294,6 +323,10 @@ class IssueService {
 
         //creating issue
         await Issue.create(createIssuePayload);
+
+        const response: any = await gatewayIssueService.on_issue(
+          createIssuePayload
+        );
 
         try {
           const updatedIssueForBugzilla: IBaseIssue =
@@ -333,10 +366,16 @@ class IssueService {
             });
           }
 
-          return res.status(201).send({
-            status: 201,
+          if (response?.data.message?.ack?.status === "ACK") {
+            await Scheduler.gracefulShutdown();
+          }else{
+            logger.info("No ACK recived for on_issue",response.data);
+          }
+
+          return res.status(200).send({
+            status: 200,
             success: true,
-            message: "Issue has been created",
+            message: {"ack": {"status": "ACK"}} // WARN: This should be a ack builder 
           });
         } catch (e) {
           return res.status(500).send({
@@ -486,8 +525,6 @@ class IssueService {
           rating: issuePayload.message.issue.rating,
         },
       });
-
-      logger.info("pushed into database");
 
       return res.status(200).send({
         context: null,
@@ -1058,6 +1095,7 @@ class IssueService {
         context: {
           ...fetchedIssueFromDataBase.context,
           action: "on_issue",
+          bpp_uri: process.env.BPP_URI || "",
           core_version: "1.0.0",
           timestamp: new Date().toISOString(),
           message_id: fetchedIssueFromDataBase.context.message_id,
