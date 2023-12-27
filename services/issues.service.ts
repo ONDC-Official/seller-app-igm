@@ -194,11 +194,11 @@ class IssueService {
 
             logger.info("transaction_id logistics",transaction_id)
 
-            
+        let createIssuePayload : IssueRequest | undefined;
         if (
           item_subcategories.includes(issuePayload.message.issue.sub_category)
         ) {
-          const issuePayloadLogisticsAndOn_issue = {
+          const issuePayloadLogisticsAndOn_issue : IssueRequest = {
             ...issuePayload,
             message: {
               issue: {
@@ -248,6 +248,8 @@ class IssueService {
             },
           };
 
+          createIssuePayload = issuePayloadLogisticsAndOn_issue;
+
           const payloadForLogistics = await logisticsContext.issuePayload(
             issuePayloadLogisticsAndOn_issue,
             transaction_id,
@@ -263,70 +265,71 @@ class IssueService {
 
             await Scheduler.gracefulShutdown();
           }
-          return res.status(200).send({
-            status: 200,
-            success: true,
-            message: {"ack": {"status": "ACK"}} // WARN: This should be a ack builder 
-          });
-        }
-
-        const createIssuePayload: IssueRequest = {
-          context: {
-            ...issuePayload.context,
-            timestamp: new Date().toISOString(),
-            action: "on_issue",
-            core_version: "1.0.0",
-            ttl: issuePayload.context.ttl,
-          },
-          message: {
-            issue: {
-              ...issuePayload.message.issue,
-
-              order_details: {
-                ...issuePayload.message.issue.order_details,
-                provider_name: organizationDetails.name,
-                items: finalpayloadForItems,
-                orderDetailsId: orderDetail["_id"],
-              },
-
-              issue_actions: {
-                complainant_actions:
-                  issuePayload.message.issue.issue_actions.complainant_actions,
-                respondent_actions: [
-                  {
-                    respondent_action: "PROCESSING",
-                    short_desc: "We are investigating your concern.",
-                    updated_at: new Date().toISOString(),
-                    updated_by: {
-                      org: {
-                        name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+        }else{
+          createIssuePayload = {
+            context: {
+              ...issuePayload.context,
+              timestamp: new Date().toISOString(),
+              action: "on_issue",
+              core_version: "1.0.0",
+              ttl: issuePayload.context.ttl,
+            },
+            message: {
+              issue: {
+                ...issuePayload.message.issue,
+  
+                order_details: {
+                  ...issuePayload.message.issue.order_details,
+                  provider_name: organizationDetails.name,
+                  items: finalpayloadForItems,
+                  orderDetailsId: orderDetail["_id"],
+                },
+  
+                issue_actions: {
+                  complainant_actions:
+                    issuePayload.message.issue.issue_actions.complainant_actions,
+                  respondent_actions: [
+                    {
+                      respondent_action: "PROCESSING",
+                      short_desc: "We are investigating your concern.",
+                      updated_at: new Date().toISOString(),
+                      updated_by: {
+                        org: {
+                          name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                        },
+                        contact: {
+                          phone: organizationDetails.contactMobile,
+                          email: organizationDetails.contactEmail,
+                        },
+                        person: {
+                          name: organizationDetails.name,
+                        },
                       },
-                      contact: {
-                        phone: organizationDetails.contactMobile,
-                        email: organizationDetails.contactEmail,
-                      },
-                      person: {
-                        name: organizationDetails.name,
-                      },
-                    },
-                    cascaded_level: 0,
-                  }
-                ],
+                      cascaded_level: 0,
+                    }
+                  ],
+                },
               },
             },
-          },
-          logisticsTransactionId: transaction_id,
-          orgEmail: organizationDetails.contactEmail,
-          orgName: organizationDetails.name,
-          orgMobile: organizationDetails.contactMobile,
-        };
+            logisticsTransactionId: transaction_id,
+            orgEmail: organizationDetails.contactEmail,
+            orgName: organizationDetails.name,
+            orgMobile: organizationDetails.contactMobile,
+          };  
 
+          const response: any = await gatewayIssueService.on_issue(
+            createIssuePayload
+          );
+          
+          if (response?.data.message?.ack?.status === "ACK") {
+            await Scheduler.gracefulShutdown();
+          }else{
+            logger.info("No ACK recived for on_issue",response.data);
+          }
+        }
+        
         //creating issue
         await Issue.create(createIssuePayload);
-
-        const response: any = await gatewayIssueService.on_issue(
-          createIssuePayload
-        );
 
         try {
           const updatedIssueForBugzilla: IBaseIssue =
@@ -364,12 +367,6 @@ class IssueService {
                 ...issuePayload?.message?.issue?.issue_actions,
               },
             });
-          }
-
-          if (response?.data.message?.ack?.status === "ACK") {
-            await Scheduler.gracefulShutdown();
-          }else{
-            logger.info("No ACK recived for on_issue",response.data);
           }
 
           return res.status(200).send({
