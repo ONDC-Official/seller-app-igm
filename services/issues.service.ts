@@ -70,8 +70,8 @@ class IssueService {
    * @param {*} res    HTTP response object
    */
   async createIssue(req: Request, res: Response) {
-
     const issuePayload: IssueRequest = req.body;
+    logger.info(issuePayload);
 
     const item_subcategories = ["FLM01", "FLM02", "FLM03"];
 
@@ -86,19 +86,6 @@ class IssueService {
         item_subcategories.includes(issue?.message?.issue?.sub_category) &&
         !this.hasKey(issue, "status")
       ) {
-
-        const selectRequest = await LogisticsSelectedRequest.findOne({
-          where: {
-            transactionId: issue.context?.transaction_id,
-            providerId: issue.message.issue.order_details?.provider_id,
-          },
-          order: [["createdAt", "DESC"]],
-        });
-
-        const transaction_id =
-          selectRequest?.getDataValue("selectedLogistics")?.context
-            .transaction_id;
-
         const payloadForLogistics = await logisticsContext.issuePayload(
           {
             context: issue.context,
@@ -116,7 +103,6 @@ class IssueService {
               },
             },
           },
-          transaction_id,
           issue.message.issue.created_at
         );
 
@@ -154,7 +140,7 @@ class IssueService {
               return item;
             }
           );
-        
+
         let orderDetail;
         // fetching the order details
 
@@ -163,7 +149,7 @@ class IssueService {
         );
 
         orderDetail = orderDetails?.data;
-        
+
         //schedule a job for sending respondant action processing after 5 min if Provider has not initiated
         Scheduler.scheduleJob(
           gatewayIssueService.startProcessingBeforeExpectedTime(
@@ -179,26 +165,11 @@ class IssueService {
           }
         );
 
-        // checking and sending to logisitics if issue is related to
-        const selectRequest = await LogisticsSelectedRequest.findOne({
-          where: {
-            transactionId: req?.body?.context?.transaction_id,
-            providerId: req?.body.message.issue.order_details.provider_id,
-          },
-          order: [["createdAt", "DESC"]],
-        });
-
-        const transaction_id =
-          selectRequest?.getDataValue("selectedLogistics")?.context
-            ?.transaction_id;
-
-            logger.info("transaction_id logistics",transaction_id)
-
-        let createIssuePayload : IssueRequest | undefined;
+        let createIssuePayload: IssueRequest | undefined;
         if (
           item_subcategories.includes(issuePayload.message.issue.sub_category)
         ) {
-          const issuePayloadLogisticsAndOn_issue : IssueRequest = {
+          const issuePayloadLogisticsAndOn_issue: IssueRequest = {
             ...issuePayload,
             message: {
               issue: {
@@ -212,7 +183,7 @@ class IssueService {
                       updated_at: new Date().toISOString(),
                       updated_by: {
                         org: {
-                          name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                          name: `${process.env.BPP_ID}::${issuePayload.context.domain}`,
                         },
                         contact: {
                           phone: organizationDetails.contactMobile,
@@ -230,7 +201,7 @@ class IssueService {
                       updated_at: new Date().toISOString(),
                       updated_by: {
                         org: {
-                          name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                          name: `${process.env.BPP_ID}::${issuePayload.context.domain}`,
                         },
                         contact: {
                           phone: organizationDetails.contactMobile,
@@ -252,20 +223,35 @@ class IssueService {
 
           const payloadForLogistics = await logisticsContext.issuePayload(
             issuePayloadLogisticsAndOn_issue,
-            transaction_id,
-            new Date().toISOString()
+            issuePayload.message.issue.created_at
           );
+
+          createIssuePayload.logisticsTransactionId =
+            payloadForLogistics.context.transaction_id;
 
           const response: any = await gatewayIssueService.on_issue(
             issuePayloadLogisticsAndOn_issue
           );
 
+          console.log("this is the retail on_issue for logistics");
+
           if (response?.data.message?.ack?.status === "ACK") {
             await logisticsService.issue_logistics(payloadForLogistics);
-
             await Scheduler.gracefulShutdown();
           }
-        }else{
+        } else {
+          const selectRequest = await LogisticsSelectedRequest.findOne({
+            where: {
+              transactionId: issuePayload?.context?.transaction_id,
+              providerId: issuePayload.message.issue.order_details.provider_id,
+            },
+            order: [["createdAt", "DESC"]],
+          });
+
+          const logisticsTransactionId =
+            selectRequest?.getDataValue("selectedLogistics")?.context
+              ?.transaction_id;
+
           createIssuePayload = {
             context: {
               ...issuePayload.context,
@@ -277,17 +263,18 @@ class IssueService {
             message: {
               issue: {
                 ...issuePayload.message.issue,
-  
+
                 order_details: {
                   ...issuePayload.message.issue.order_details,
                   provider_name: organizationDetails.name,
                   items: finalpayloadForItems,
                   orderDetailsId: orderDetail["_id"],
                 },
-  
+
                 issue_actions: {
                   complainant_actions:
-                    issuePayload.message.issue.issue_actions.complainant_actions,
+                    issuePayload.message.issue.issue_actions
+                      .complainant_actions,
                   respondent_actions: [
                     {
                       respondent_action: "PROCESSING",
@@ -295,7 +282,7 @@ class IssueService {
                       updated_at: new Date().toISOString(),
                       updated_by: {
                         org: {
-                          name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                          name: `${process.env.BPP_ID}::${issuePayload.context.domain}`,
                         },
                         contact: {
                           phone: organizationDetails.contactMobile,
@@ -306,28 +293,30 @@ class IssueService {
                         },
                       },
                       cascaded_level: 0,
-                    }
+                    },
                   ],
                 },
               },
             },
-            logisticsTransactionId: transaction_id,
+            logisticsTransactionId: logisticsTransactionId,
             orgEmail: organizationDetails.contactEmail,
             orgName: organizationDetails.name,
             orgMobile: organizationDetails.contactMobile,
-          };  
+          };
 
           const response: any = await gatewayIssueService.on_issue(
             createIssuePayload
           );
-          
+
+          console.log("this is the on_issue for non-logistics");
+
           if (response?.data.message?.ack?.status === "ACK") {
             await Scheduler.gracefulShutdown();
-          }else{
-            logger.info("No ACK recived for on_issue",response.data);
+          } else {
+            logger.info("No ACK recived for on_issue", response.data);
           }
         }
-        
+
         //creating issue
         await Issue.create(createIssuePayload);
 
@@ -372,7 +361,7 @@ class IssueService {
           return res.status(200).send({
             status: 200,
             success: true,
-            message: {"ack": {"status": "ACK"}} // WARN: This should be a ack builder 
+            message: { ack: { status: "ACK" } }, // WARN: This should be a ack builder
           });
         } catch (e) {
           return res.status(500).send({
@@ -416,7 +405,7 @@ class IssueService {
                         updated_at: new Date().toISOString(),
                         updated_by: {
                           org: {
-                            name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                            name: `${process.env.BPP_ID}::${issuePayload.context.domain}`,
                           },
                           contact: {
                             phone: issue.orgMobile,
@@ -467,7 +456,6 @@ class IssueService {
               });
 
               return res.status(200).send({
-                context: null,
                 message: {
                   ack: {
                     status: "ACK",
@@ -646,7 +634,7 @@ class IssueService {
         updated_at: new Date().toISOString(),
         updated_by: {
           org: {
-            name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+            name: `${process.env.BPP_ID}::${req.body.domain}`,
           },
           contact: {
             phone: req.body.updated_by.contact.phone,
@@ -873,9 +861,9 @@ class IssueService {
   async on_issue_logistics(req: Request, res: Response) {
     try {
       const {
-        messageId: logisticsMessageId,
-        transactionId: logisticsTransactionId,
-      } = req?.body;
+        message_id: logisticsMessageId,
+        transaction_id: logisticsTransactionId,
+      } = req?.body.context;
 
       const issueRequest: any = await Issue.findOne({
         logisticsTransactionId: logisticsTransactionId,
@@ -889,6 +877,11 @@ class IssueService {
         "issue"
       );
 
+      console.log(
+        "on_issue_logistics recieved from logistics =====>",
+        req.body
+      );
+
       const retail_issue = logisticsResponse?.retail_issue;
       const logistics_on_issue = logisticsResponse?.logistics_on_issue;
 
@@ -896,10 +889,10 @@ class IssueService {
         context: {
           message_id: uuid(),
           timestamp: req?.body?.context?.timestamp,
-          domain: "nic2004:52110",
+          domain: issueRequest?.context?.domain,
           country: retail_issue?.[0]?.context?.country,
           city: retail_issue?.[0]?.context?.city,
-          action: "on_issue_status",
+          action: "on_issue",
           core_version: retail_issue?.[0].context.core_version,
           bap_uri: retail_issue?.[0].context.bap_uri,
           bap_id: retail_issue?.[0]?.context?.bap_id,
@@ -961,6 +954,7 @@ class IssueService {
         },
       });
     } catch (e) {
+      console.log(e);
       return res.status(500).json({
         error: true,
         message: JSON.stringify(e) || "Something went wrong",
@@ -978,9 +972,9 @@ class IssueService {
     try {
       let mergedIssueWithLogisticsRespondentAction: any;
       const {
-        messageId: logisiticsMessageId,
-        transactionId: logisticsTransactionId,
-      } = req?.body;
+        message_id: logisiticsMessageId,
+        transaction_id: logisticsTransactionId,
+      } = req?.body.context;
 
       const issueRequest: any = await Issue.findOne({
         logisticsTransactionId: logisticsTransactionId,
@@ -1003,7 +997,7 @@ class IssueService {
         context: {
           message_id: retailMessageId,
           timestamp: req?.body?.context?.timestamp,
-          domain: "nic2004:52110",
+          domain: issueRequest?.context?.domain,
           country: retail_issue_status?.[0]?.context?.country,
           city: retail_issue_status?.[0]?.context?.city,
           action: "on_issue_status",
@@ -1066,6 +1060,7 @@ class IssueService {
         },
       });
     } catch (e) {
+      console.error(e);
       return res.status(500).json({
         error: true,
         message: JSON.stringify(e) || "Something went wrong",
@@ -1075,7 +1070,7 @@ class IssueService {
 
   /// Utility Function for Issue Service
 
-  //  creating payload for on_issue_status_status for "PROCESSING","REFUND" and other Cases
+  //  creating payload for on_issue_status for "PROCESSING","REFUND" and other Cases
 
   respondingToIssueByProvider({
     fetchedIssueFromDataBase,
@@ -1115,7 +1110,7 @@ class IssueService {
                       phone: payload.updated_by.contact.phone,
                     },
                     org: {
-                      name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                      name: `${process.env.BPP_ID}::${fetchedIssueFromDataBase.context.domain}`,
                     },
                     person: { name: payload.updated_by.person.name },
                   },
@@ -1153,7 +1148,7 @@ class IssueService {
                       phone: payload.updated_by.contact.phone,
                     },
                     org: {
-                      name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                      name: `${process.env.BPP_ID}::${fetchedIssueFromDataBase.context.domain}`,
                     },
                     person: { name: payload.updated_by.person.name },
                   },
@@ -1171,7 +1166,7 @@ class IssueService {
                 type: "TRANSACTION-COUNTERPARTY-NP",
                 organization: {
                   org: {
-                    name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                    name: `${process.env.BPP_ID}::${fetchedIssueFromDataBase.context.domain}`,
                   },
                   contact: {
                     email: payload.updated_by.contact.email,
@@ -1229,7 +1224,7 @@ class IssueService {
                       phone: payload.updated_by.contact.phone,
                     },
                     org: {
-                      name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                      name: `${process.env.BPP_ID}::${fetchedIssueFromDataBase.context.domain}`,
                     },
                     person: { name: payload.updated_by.person.name },
                   },
@@ -1246,7 +1241,7 @@ class IssueService {
                 type: "TRANSACTION-COUNTERPARTY-NP",
                 organization: {
                   org: {
-                    name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                    name: `${process.env.BPP_ID}::${fetchedIssueFromDataBase.context.domain}`,
                   },
                   contact: {
                     email: payload.updated_by.contact.email,
@@ -1311,7 +1306,7 @@ class IssueService {
           type: "TRANSACTION-COUNTERPARTY-NP",
           organization: {
             org: {
-              name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+              name: `${process.env.BPP_ID}::${fetchedIssueFromDataBase.context.domain}`,
             },
             contact: {
               email: payload.updated_by.contact.email,
@@ -1344,14 +1339,6 @@ class IssueService {
 
   async issueResponseCasecaded({ issuePayload }: { issuePayload: any }) {
     try {
-      const selectRequest = await LogisticsSelectedRequest.findOne({
-        where: {
-          transactionId: issuePayload?.context?.transaction_id,
-          providerId: issuePayload.message.issue.order_details.provider_id,
-        },
-        order: [["createdAt", "DESC"]],
-      });
-
       // fetching the organization details from the DB
       const fetchedOrgDetails = await axios.get(
         `${process.env.SELLER_SERVER_URL}/api/v1/organizations/${issuePayload?.message?.issue?.order_details?.provider_id}/ondcGet`
@@ -1363,10 +1350,6 @@ class IssueService {
         "🚀 ~ file: issues.service.ts:130 ~ IssueService ~ createIssue ~ organizationDetails:",
         JSON.stringify(organizationDetails)
       );
-
-      const transaction_id =
-        selectRequest?.getDataValue("selectedLogistics")?.context
-          ?.transaction_id;
 
       const issuePayloadLogisticsAndOn_issue = {
         context: { ...issuePayload.context },
@@ -1384,7 +1367,7 @@ class IssueService {
                   updated_at: new Date().toISOString(),
                   updated_by: {
                     org: {
-                      name: `${process.env.BPP_URI}::${process.env.DOMAIN}`,
+                      name: `${process.env.BPP_ID}::${issuePayload.context.domain}`,
                     },
                     contact: {
                       phone: organizationDetails.contactMobile,
@@ -1404,8 +1387,7 @@ class IssueService {
 
       const payloadForLogistics = await logisticsContext.issuePayload(
         issuePayloadLogisticsAndOn_issue,
-        new Date().toISOString(),
-        transaction_id
+        issuePayload.message.issue.created_at
       );
 
       const response: any = await logisticsService.issue_logistics(
