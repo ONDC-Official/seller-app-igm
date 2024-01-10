@@ -18,11 +18,7 @@ class LogisticsContext {
     return key in obj;
   }
 
-  async issuePayload(
-    issue: any,
-    created_at: string,
-    _logisticsTransactionID?: string
-  ) {
+  async issuePayload(issue: any, created_at: string) {
     const omittedArray: OmittedProviderNameFromItems =
       issue?.message?.issue?.order_details?.items?.map(
         ({ product_name, ...rest }: any) => rest
