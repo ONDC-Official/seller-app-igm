@@ -357,18 +357,14 @@ class IssueService {
               },
             });
           }
-
-          return res.status(200).send({
-            status: 200,
-            success: true,
-            message: { ack: { status: "ACK" } }, // WARN: This should be a ack builder
-          });
         } catch (e) {
-          return res.status(500).send({
-            success: false,
-            message: e || "Something went wrong",
-          });
+          logger.info(e);
         }
+        return res.status(200).send({
+          status: 200,
+          success: true,
+          message: { ack: { status: "ACK" } }, // WARN: This should be a ack builder
+        });
       }
 
       const complaintActionLength =
