@@ -763,7 +763,11 @@ class IssueService {
           message: result.message || "Something went wrong",
         });
       }
-
+      if (
+        this.hasCascadedAction(
+          result?.message?.issue?.issue_actions?.respondent_actions
+        )
+      ) {
       const selectRequest = await LogisticsSelectedRequest.findOne({
         where: {
           transactionId: result?.context?.transaction_id,
@@ -795,11 +799,7 @@ class IssueService {
         },
       };
 
-      if (
-        this.hasCascadedAction(
-          result?.message?.issue?.issue_actions?.respondent_actions
-        )
-      ) {
+
         await dbServices.addOrUpdateIssueWithKeyValue({
           issueKeyToFind: "message.issue.id",
           issueValueToFind: issue_id,
