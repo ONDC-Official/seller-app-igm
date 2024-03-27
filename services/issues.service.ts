@@ -357,18 +357,14 @@ class IssueService {
               },
             });
           }
-
-          return res.status(200).send({
-            status: 200,
-            success: true,
-            message: { ack: { status: "ACK" } }, // WARN: This should be a ack builder
-          });
         } catch (e) {
-          return res.status(500).send({
-            success: false,
-            message: e || "Something went wrong",
-          });
+          logger.info(e);
         }
+        return res.status(200).send({
+          status: 200,
+          success: true,
+          message: { ack: { status: "ACK" } }, // WARN: This should be a ack builder
+        });
       }
 
       const complaintActionLength =
@@ -767,7 +763,11 @@ class IssueService {
           message: result.message || "Something went wrong",
         });
       }
-
+      if (
+        this.hasCascadedAction(
+          result?.message?.issue?.issue_actions?.respondent_actions
+        )
+      ) {
       const selectRequest = await LogisticsSelectedRequest.findOne({
         where: {
           transactionId: result?.context?.transaction_id,
@@ -799,11 +799,7 @@ class IssueService {
         },
       };
 
-      if (
-        this.hasCascadedAction(
-          result?.message?.issue?.issue_actions?.respondent_actions
-        )
-      ) {
+
         await dbServices.addOrUpdateIssueWithKeyValue({
           issueKeyToFind: "message.issue.id",
           issueValueToFind: issue_id,
